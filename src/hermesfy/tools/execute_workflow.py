@@ -38,23 +38,40 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
                 return {"mock": True, "node_type": node_type, "image_url": "https://example.com/mock.png"}
         provider = MockProvider()
 
-    # Run the executor (sync wrapper around async)
+    # Run the executor in a dedicated thread with its own event loop.
+    # This works in both sync and async contexts without deadlocks.
     events = []
-    try:
-        async def _run():
-            async for event in execute(workflow, provider):
-                events.append(event)
+    async_error: Exception | None = None
 
+    async def _run():
+        async for event in execute(workflow, provider):
+            events.append(event)
+
+    def _thread_target():
+        nonlocal async_error
         try:
-            loop = asyncio.get_running_loop()
-            # Already in async context — cannot use asyncio.run()
-            # In sync context, use asyncio.run()
-            return json.dumps({"error": {"code": "PROVIDER_ERROR", "message": "execute_workflow must be called from sync context"}})
-        except RuntimeError:
-            # No running loop — use asyncio.run()
             asyncio.run(_run())
-    except Exception as exc:
-        return json.dumps({"error": {"code": PROVIDER_ERROR, "message": str(exc)}})
+        except Exception as exc:
+            async_error = exc
 
-    canvas = render_minimal_canvas(workflow)
+    import threading
+    thread = threading.Thread(target=_thread_target)
+    thread.start()
+    thread.join(timeout=300)
+
+    if async_error:
+        return json.dumps({"error": {"code": PROVIDER_ERROR, "message": str(async_error)}})
+
+    # Extract node states and errors from emitted events
+    node_states: dict[str, str] = {}
+    node_errors: dict[str, str] = {}
+    for event in events:
+        if event.event_type == "node_error":
+            node_errors[event.node_id] = event.data.get("error", "unknown error") if event.data else "unknown error"
+        elif event.event_type == "workflow_done" and event.data:
+            ns = event.data.get("node_states", {})
+            # NodeState(str, Enum) values are already strings: "completed", "failed", etc.
+            node_states = {k: str(v) for k, v in ns.items()}
+
+    canvas = render_minimal_canvas(workflow, node_states=node_states, node_errors=node_errors)
     return json.dumps({"canvas": canvas, "events_count": len(events)})
