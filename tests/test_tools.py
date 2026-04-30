@@ -231,8 +231,8 @@ class TestListModels:
 class TestSaveLoad:
     """Tests for save_workflow and load_workflow tools."""
 
-    def test_save_and_load_roundtrip(self, tmp_path):
-        """Save a workflow, then load it back — full state preserved."""
+    def test_save_and_load_roundtrip(self):
+        """Save a workflow (auto-name), then load it back — full state preserved."""
         from hermesfy.tools.define_workflow import define_workflow
         from hermesfy.tools.save_workflow import save_workflow
         from hermesfy.tools.load_workflow import load_workflow
@@ -241,22 +241,62 @@ class TestSaveLoad:
         def_result = json.loads(define_workflow(nodes=make_tool_nodes(), edges=make_tool_edges(), name="roundtrip-flow"))
         wf_id = def_result["workflow_id"]
 
-        # Save to temp dir (override default path)
-        custom_dir = tmp_path / "workflows"
-        result = save_workflow(workflow_id=wf_id, filename=str(custom_dir / "roundtrip-flow"))
+        # Save with auto-generated name (in sandbox dir)
+        result = save_workflow(workflow_id=wf_id)
         parsed_save = json.loads(result) if isinstance(result, str) else result
         assert "file" in parsed_save
         assert os.path.exists(parsed_save["file"])
 
-        # Load
-        load_result = json.loads(load_workflow(filename=parsed_save["file"]))
+        # Load by auto-generated filename (relative to sandbox dir)
+        saved_filename = Path(parsed_save["file"]).name
+        load_result = json.loads(load_workflow(filename=saved_filename))
         assert "workflow_id" in load_result
         assert "canvas" in load_result
+
+        # Cleanup
+        os.remove(parsed_save["file"])
 
     def test_load_nonexistent_file(self):
         """Loading a non-existent file returns FILE_NOT_FOUND error."""
         from hermesfy.tools.load_workflow import load_workflow
 
-        result = json.loads(load_workflow(filename="/nonexistent/path/workflow.json"))
+        result = json.loads(load_workflow(filename="nonexistent_file_jklsdf.json"))
         assert "error" in result
         assert result["error"]["code"] == "FILE_NOT_FOUND"
+
+    def test_path_traversal_blocked_on_save(self):
+        """Path traversal attempt in save_workflow returns INVALID_WORKFLOW."""
+        from hermesfy.tools.define_workflow import define_workflow
+        from hermesfy.tools.save_workflow import save_workflow
+
+        def_result = json.loads(define_workflow(nodes=make_tool_nodes(), edges=make_tool_edges()))
+        wf_id = def_result["workflow_id"]
+
+        # Attempt path traversal
+        result = json.loads(save_workflow(workflow_id=wf_id, filename="../../.bashrc"))
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_WORKFLOW"
+
+    def test_path_traversal_blocked_on_load(self):
+        """Path traversal attempt in load_workflow returns INVALID_WORKFLOW."""
+        from hermesfy.tools.load_workflow import load_workflow
+
+        result = json.loads(load_workflow(filename="../../etc/passwd"))
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_WORKFLOW"
+
+    def test_invalid_filename_characters(self):
+        """Filename with illegal characters returns INVALID_WORKFLOW."""
+        from hermesfy.tools.load_workflow import load_workflow
+
+        result = json.loads(load_workflow(filename="workflow\x00null.json"))
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_WORKFLOW"
+
+    def test_absolute_path_blocked(self):
+        """Absolute path is blocked by sandbox."""
+        from hermesfy.tools.load_workflow import load_workflow
+
+        result = json.loads(load_workflow(filename="/etc/passwd"))
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_WORKFLOW"
