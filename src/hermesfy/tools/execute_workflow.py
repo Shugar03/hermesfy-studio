@@ -73,7 +73,16 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
 
     canvas = render_minimal_canvas(workflow, node_states=node_states, node_errors=node_errors)
 
+    # Serialize events for persistence
+    serialized_events = []
+    for event in events:
+        serialized_events.append({
+            "event_type": event.event_type,
+            "node_id": event.node_id,
+            "data": event.data,
+        })
+
     # Persist states so workflow_status can access them later
-    set_workflow_states(workflow_id, node_states, node_errors)
+    set_workflow_states(workflow_id, node_states, node_errors, serialized_events)
 
     return json.dumps({"canvas": canvas, "events_count": len(events)})

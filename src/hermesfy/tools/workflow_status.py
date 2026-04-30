@@ -18,6 +18,6 @@ def workflow_status(workflow_id: str) -> str:
     if workflow is None:
         return json.dumps({"error": {"code": "NODE_NOT_FOUND", "message": f"Workflow '{workflow_id}' not found"}})
 
-    node_states, node_errors = get_workflow_states(workflow_id)
+    node_states, node_errors, _events = get_workflow_states(workflow_id)
     canvas = render_minimal_canvas(workflow, node_states=node_states or None, node_errors=node_errors or None)
     return json.dumps({"canvas": canvas})

@@ -8,7 +8,7 @@ from hermesfy.dag.graph import Workflow
 # Module-level workflow store
 workflows: dict[str, Workflow] = {}
 
-# Execution state store: workflow_id → {"node_states": {...}, "node_errors": {...}}
+# Execution state store: workflow_id → {"node_states": {...}, "node_errors": {...}, "events": [...]}
 _workflow_states: dict[str, dict] = {}
 
 
@@ -33,12 +33,25 @@ def list_workflows() -> list[Workflow]:
     return list(workflows.values())
 
 
-def set_workflow_states(workflow_id: str, node_states: dict[str, str], node_errors: dict[str, str]) -> None:
-    """Store execution states for a workflow after execution."""
-    _workflow_states[workflow_id] = {"node_states": node_states, "node_errors": node_errors}
+def set_workflow_states(
+    workflow_id: str,
+    node_states: dict[str, str],
+    node_errors: dict[str, str],
+    events: list[dict] | None = None,
+) -> None:
+    """Store execution states and events for a workflow after execution."""
+    _workflow_states[workflow_id] = {
+        "node_states": node_states,
+        "node_errors": node_errors,
+        "events": events or [],
+    }
 
 
-def get_workflow_states(workflow_id: str) -> tuple[dict[str, str], dict[str, str]]:
-    """Retrieve execution states for a workflow. Returns (node_states, node_errors)."""
+def get_workflow_states(workflow_id: str) -> tuple[dict[str, str], dict[str, str], list[dict]]:
+    """Retrieve execution states for a workflow. Returns (node_states, node_errors, events)."""
     entry = _workflow_states.get(workflow_id, {})
-    return entry.get("node_states", {}), entry.get("node_errors", {})
+    return (
+        entry.get("node_states", {}),
+        entry.get("node_errors", {}),
+        entry.get("events", []),
+    )

@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermesfy Studio — Workflow Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0A0E14;
+  --bg-raised: #0D1117;
+  --bg-surface: #161B22;
+  --fg: #E6FFF9;
+  --fg-dim: rgba(230,255,249,0.5);
+  --fg-muted: rgba(230,255,249,0.3);
+  --mint-base: #A8E6CF;
+  --mint-deep: #7FDBCA;
+  --electric: #00FFC6;
+  --glitch: #00E5FF;
+  --red: #FF6464;
+  --red-bg: rgba(255,100,100,0.08);
+  --amber: #f59e0b;
+  --border: rgba(168,230,207,0.08);
+  --border-active: rgba(168,230,207,0.2);
+  --glass: rgba(13,17,23,0.7);
+  --glass-border: rgba(127,219,202,0.12);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 20px rgba(0,255,198,0.08);
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100dvh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* CRT scanlines */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0px, rgba(0,0,0,0.04) 1px, transparent 1px, transparent 3px);
+  opacity: 0.03;
+}
+
+/* ── APP GRID ─────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr;
+  height: 100dvh;
+}
+
+/* ── HEADER ───────────────────────────────────────────── */
+.header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: relative;
+  z-index: 10;
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--electric), transparent);
+  opacity: 0.15;
+}
+
+.header-left { display: flex; align-items: baseline; gap: 14px; }
+
+.header h1 {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--fg), var(--mint-base));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header .subtitle {
+  font-size: 12px;
+  color: var(--fg-muted);
+  letter-spacing: 0.04em;
+}
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+
+.wf-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: var(--bg-raised);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+/* ── SIDEBAR ──────────────────────────────────────────── */
+.sidebar {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--glass-border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 16px 18px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mint-deep);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sidebar-list { flex: 1; padding: 0 6px; }
+
+.wf-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  margin: 2px 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  transition: all var(--transition);
+  position: relative;
+}
+
+.wf-item:hover {
+  background: rgba(168,230,207,0.04);
+}
+
+.wf-item.active {
+  border-left-color: var(--electric);
+  background: rgba(0,255,198,0.04);
+  box-shadow: var(--shadow-glow);
+}
+
+.wf-item:active { transform: scale(0.99); }
+
+.wf-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wf-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-muted);
+}
+
+.state-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.state-dot.pending { background: var(--fg-muted); }
+.state-dot.running { background: var(--glitch); box-shadow: 0 0 6px var(--glitch); }
+.state-dot.completed { background: var(--electric); box-shadow: 0 0 6px rgba(0,255,198,0.4); }
+.state-dot.failed { background: var(--red); box-shadow: 0 0 6px rgba(255,100,100,0.4); }
+
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── BUTTONS ──────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--fg);
+  width: 100%;
+}
+
+.btn:hover { border-color: var(--border-active); background: var(--bg-surface); }
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  background: var(--electric);
+  color: var(--bg);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 16px rgba(0,255,198,0.25);
+  background: #00e6b8;
+}
+
+.file-input-wrap { position: relative; overflow: hidden; }
+.file-input-wrap input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+
+/* ── MAIN PANEL ───────────────────────────────────────── */
+.main {
+  overflow-y: auto;
+  padding: 24px 32px;
+  background: var(--bg);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  opacity: 0.3;
+}
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  border: 2px dashed var(--border-active);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--mint-deep);
+}
+
+.empty-text { font-size: 13px; color: var(--fg-dim); }
+
+/* ── WORKFLOW HEADER ──────────────────────────────────── */
+.wf-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.wf-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.wf-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-muted);
+  background: var(--bg-raised);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* ── BADGE ────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.badge.pending { background: var(--bg-raised); color: var(--fg-muted); border: 1px solid var(--border); }
+.badge.running { background: rgba(0,229,255,0.08); color: var(--glitch); border: 1px solid rgba(0,229,255,0.2); }
+.badge.completed { background: rgba(0,255,198,0.08); color: var(--electric); border: 1px solid rgba(0,255,198,0.2); }
+.badge.failed { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,100,100,0.2); }
+
+.badge-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: currentColor;
+}
+
+/* ── DAG CANVAS ───────────────────────────────────────── */
+.dag-section {
+  margin-bottom: 24px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mint-deep);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+
+.dag-canvas {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  position: relative;
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Dot grid background */
+.dag-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.5;
+  pointer-events: none;
+  border-radius: var(--radius);
+}
+
+.dag-flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: max-content;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── NODE CARD ────────────────────────────────────────── */
+.node-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  min-width: 220px;
+  max-width: 300px;
+  transition: all var(--transition);
+  cursor: pointer;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+
+.node-card:hover {
+  border-color: var(--border-active);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.node-card.selected {
+  border-color: var(--electric);
+  box-shadow: 0 0 0 2px rgba(0,255,198,0.15), var(--shadow-md);
+}
+
+/* State-based borders */
+.node-card.pending { border-color: rgba(168,230,207,0.12); }
+.node-card.running { border-color: var(--glitch); background: rgba(0,229,255,0.03); }
+.node-card.completed { border-color: rgba(0,255,198,0.25); }
+.node-card.failed { border-color: rgba(255,100,100,0.25); background: rgba(255,100,100,0.02); }
+
+/* State glow on top */
+.node-card.completed::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 16px; right: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--electric), transparent);
+  opacity: 0.4;
+}
+
+.node-card.failed::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 16px; right: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--red), transparent);
+  opacity: 0.4;
+}
+
+.node-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.node-state-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.node-state-icon.pending { background: var(--bg-raised); border: 1px solid var(--border); }
+.node-state-icon.running { background: rgba(0,229,255,0.15); border: 1px solid rgba(0,229,255,0.3); color: var(--glitch); }
+.node-state-icon.completed { background: rgba(0,255,198,0.15); border: 1px solid rgba(0,255,198,0.3); color: var(--electric); }
+.node-state-icon.failed { background: rgba(255,100,100,0.15); border: 1px solid rgba(255,100,100,0.3); color: var(--red); }
+
+.node-type-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.node-type-badge.text_prompt { color: var(--mint-deep); background: rgba(127,219,202,0.1); }
+.node-type-badge.image_gen { color: var(--electric); background: rgba(0,255,198,0.1); }
+.node-type-badge.img2img { color: var(--glitch); background: rgba(0,229,255,0.1); }
+.node-type-badge.upscale { color: var(--amber); background: rgba(245,158,11,0.1); }
+.node-type-badge.seed { color: var(--fg-dim); background: rgba(230,255,249,0.05); }
+
+.node-id-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-muted);
+  margin-left: auto;
+}
+
+.node-config-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--fg-dim);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.node-error-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--red);
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--red-bg);
+  border-radius: 4px;
+  border: 1px solid rgba(255,100,100,0.15);
+  line-height: 1.4;
+}
+
+/* ── EDGE CONNECTOR ───────────────────────────────────── */
+.edge-connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.edge-line {
+  width: 100%;
+  height: 2px;
+  background: var(--border-active);
+  position: relative;
+  border-radius: 1px;
+}
+
+.edge-line.completed { background: rgba(0,255,198,0.3); }
+.edge-line.failed { background: rgba(255,100,100,0.3); }
+.edge-line.running {
+  background: var(--glitch);
+  box-shadow: 0 0 8px rgba(0,229,255,0.3);
+}
+
+/* Arrow at end of edge */
+.edge-connector::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--border-active);
+}
+
+.edge-connector.completed::after { border-left-color: rgba(0,255,198,0.3); }
+.edge-connector.failed::after { border-left-color: rgba(255,100,100,0.3); }
+.edge-connector.running::after { border-left-color: var(--glitch); }
+
+/* ── DIVIDER ──────────────────────────────────────────── */
+.divider {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 24px 0;
+  position: relative;
+}
+
+.divider::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 60px;
+  height: 1px;
+  background: var(--electric);
+  opacity: 0.3;
+}
+
+/* ── EVENT LOG ────────────────────────────────────────── */
+.event-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.event-table th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.event-table td {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid rgba(168,230,207,0.03);
+  color: var(--fg-dim);
+  vertical-align: top;
+}
+
+.event-table tr:hover td { background: rgba(168,230,207,0.02); }
+
+.ev-type { font-weight: 600; }
+.ev-type.node_start { color: var(--fg-dim); }
+.ev-type.node_complete { color: var(--electric); }
+.ev-type.node_error { color: var(--red); }
+.ev-type.workflow_done { color: var(--glitch); }
+
+.ev-detail {
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── INSPECTOR ────────────────────────────────────────── */
+.inspector {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-x: auto;
+  white-space: pre;
+  box-shadow: var(--shadow-sm);
+}
+
+.jk { color: var(--mint-deep); }
+.js { color: var(--electric); }
+.jn { color: var(--glitch); }
+.jb { color: var(--amber); }
+.jl { color: var(--fg-muted); }
+
+/* ── SCROLLBAR ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(168,230,207,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(168,230,207,0.2); }
+
+/* ── RESPONSIVE ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .main { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="header-left">
+      <h1>Hermesfy Studio</h1>
+      <span class="subtitle">Workflow Audit</span>
+    </div>
+    <div class="header-right">
+      <span class="wf-count" id="wfCount">0 workflows</span>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">Workflows</div>
+    <div class="sidebar-list" id="workflowList"></div>
+    <div class="sidebar-footer">
+      <div class="file-input-wrap">
+        <button class="btn btn-primary">+ Load JSON</button>
+        <input type="file" id="fileInput" accept=".json" multiple>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main" id="mainPanel">
+    <div class="empty-state">
+      <div class="empty-icon">&#x2B22;</div>
+      <div class="empty-text">Select a workflow to inspect</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const S = { wfs: {}, sel: null, selNode: null };
+
+const EMOJI = { pending:'\u25CB', running:'\u23F3', completed:'\u2705', failed:'\u274C', retrying:'\u27F3', quality_exhausted:'\u2620' };
+const TYPELabel = { text_prompt:'TEXT', image_gen:'GEN', img2img:'IMG2IMG', upscale:'UPSCALE', seed:'SEED' };
+
+function wfState(wf) {
+  const ex = wf.execution;
+  if (!ex?.node_states) return 'pending';
+  const v = Object.values(ex.node_states);
+  if (v.every(s => s === 'completed')) return 'completed';
+  if (v.some(s => s === 'failed')) return 'failed';
+  if (v.some(s => s === 'running')) return 'running';
+  return 'pending';
+}
+
+function fmtConfig(c) {
+  const p = [];
+  if (c.prompt) p.push(`prompt="${c.prompt.slice(0,35)}${c.prompt.length>35?'...':''}"`);
+  if (c.model) p.push(c.model);
+  if (c.width && c.height) p.push(`${c.width}\u00D7${c.height}`);
+  if (c.seed !== undefined) p.push(`seed=${c.seed}`);
+  return p.join(' \u00B7 ') || '(config)';
+}
+
+function hl(json) {
+  return JSON.stringify(json, null, 2).replace(
+    /("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+    m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="jk">${m}</span>` : `<span class="js">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="jb">${m}</span>`;
+      if (/null/.test(m)) return `<span class="jl">${m}</span>`;
+      return `<span class="jn">${m}</span>`;
+    }
+  );
+}
+
+// ── SIDEBAR ────────────────────────────────────────────
+function renderSidebar() {
+  const el = document.getElementById('workflowList');
+  const ids = Object.keys(S.wfs);
+  document.getElementById('wfCount').textContent = `${ids.length} workflow${ids.length!==1?'s':''}`;
+
+  if (!ids.length) {
+    el.innerHTML = `<div style="padding:24px 14px;font-size:12px;color:var(--fg-muted);line-height:1.6;">
+      No workflows loaded.<br>Click <b>+ Load JSON</b> to import.</div>`;
+    return;
+  }
+
+  el.innerHTML = ids.map(id => {
+    const wf = S.wfs[id], st = wfState(wf), active = S.sel===id;
+    const nc = wf.nodes?.length || 0;
+    return `<div class="wf-item ${active?'active':''}" onclick="selWf('${id}')">
+      <div class="wf-name">${wf.name||'unnamed'}</div>
+      <div class="wf-meta">
+        <span class="state-dot ${st}"></span>
+        <span>${nc} node${nc!==1?'s':''} \u00B7 ${st}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── MAIN PANEL ─────────────────────────────────────────
+function renderMain() {
+  const panel = document.getElementById('mainPanel');
+  if (!S.sel || !S.wfs[S.sel]) {
+    panel.innerHTML = `<div class="empty-state"><div class="empty-icon">&#x2B22;</div><div class="empty-text">Select a workflow to inspect</div></div>`;
+    return;
+  }
+
+  const wf = S.wfs[S.sel];
+  const ex = wf.execution || {};
+  const ns = ex.node_states || {};
+  const ne = ex.node_errors || {};
+  const ev = ex.events || [];
+  const st = wfState(wf);
+
+  // DAG nodes
+  const nodes = (wf.nodes||[]).map((n, i) => {
+    const s = ns[n.id]||'pending';
+    const sel = S.selNode===n.id;
+    const err = ne[n.id];
+    const tl = TYPELabel[n.type]||n.type?.toUpperCase()||'?';
+
+    let edge = '';
+    if (i > 0) {
+      const prev = wf.nodes[i-1];
+      const ps = ns[prev.id]||'pending';
+      let ec = '';
+      if (ps==='completed' && s==='completed') ec='completed';
+      else if (ps==='failed'||s==='failed') ec='failed';
+      else if (s==='running') ec='running';
+      edge = `<div class="edge-connector ${ec}"><div class="edge-line ${ec}"></div></div>`;
+    }
+
+    return `${edge}
+    <div class="node-card ${s} ${sel?'selected':''}" onclick="selNode('${n.id}')">
+      <div class="node-top">
+        <div class="node-state-icon ${s}">${s==='completed'?'\u2713':s==='failed'?'\u2717':s==='running'?'\u25B6':'\u25CB'}</div>
+        <span class="node-type-badge ${n.type}">${tl}</span>
+        <span class="node-id-label">${n.id}</span>
+      </div>
+      <div class="node-config-text">${fmtConfig(n.config||{})}</div>
+      ${err?`<div class="node-error-text">\u26A0 ${err.slice(0,100)}${err.length>100?'...':''}</div>`:''}
+    </div>`;
+  }).join('');
+
+  // Event rows
+  const rows = ev.slice().reverse().map(e => {
+    let det = '';
+    if (e.data) {
+      if (e.data.error) det = e.data.error;
+      else if (e.data.output) det = JSON.stringify(e.data.output).slice(0,140);
+      else if (e.data.config) det = JSON.stringify(e.data.config).slice(0,140);
+    }
+    return `<tr>
+      <td style="opacity:0.4;white-space:nowrap;">${e.timestamp||'\u2014'}</td>
+      <td>${e.node_id||''}</td>
+      <td class="ev-type ${e.event_type}">${e.event_type||''}</td>
+      <td class="ev-detail">${det}</td>
+    </tr>`;
+  }).join('');
+
+  // Inspector
+  let insp = '';
+  if (S.selNode) {
+    const n = (wf.nodes||[]).find(x=>x.id===S.selNode);
+    if (n) {
+      const d = { id:n.id, type:n.type, config:n.config||{}, state:ns[n.id]||'pending' };
+      if (ne[n.id]) d.error = ne[n.id];
+      const nev = ev.filter(e=>e.node_id===n.id);
+      if (nev.length) d.events = nev;
+      insp = hl(d);
+    }
+  }
+
+  panel.innerHTML = `
+    <div class="wf-header">
+      <h2>${wf.name||'unnamed'}</h2>
+      <span class="badge ${st}"><span class="badge-dot"></span>${st}</span>
+      <span class="wf-id">${wf.id||''}</span>
+    </div>
+
+    <div class="dag-section">
+      <div class="section-label">DAG Graph</div>
+      <div class="dag-canvas">
+        <div class="dag-flow">${nodes.length?nodes:'<span style="opacity:0.3;font-size:12px;">No nodes</span>'}</div>
+      </div>
+    </div>
+
+    ${ev.length?`
+    <div class="dag-section">
+      <div class="section-label">Event Log</div>
+      <table class="event-table">
+        <thead><tr><th>Timestamp</th><th>Node</th><th>Event</th><th>Detail</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`:''}
+
+    ${S.selNode?`
+    <div class="dag-section">
+      <div class="section-label">Node Inspector \u2014 ${S.selNode}</div>
+      <div class="inspector">${insp}</div>
+    </div>`:''}
+  `;
+}
+
+function selWf(id) { S.sel=id; S.selNode=null; renderSidebar(); renderMain(); }
+function selNode(id) { S.selNode=S.selNode===id?null:id; renderMain(); }
+
+function loadFiles(files) {
+  [...files].forEach(f => {
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const d = JSON.parse(e.target.result);
+        if (d.id) { S.wfs[d.id]=d; S.sel=d.id; renderSidebar(); renderMain(); }
+      } catch(err) { console.error('Invalid JSON:', f.name, err); }
+    };
+    r.readAsText(f);
+  });
+}
+
+// Auto-load from /workflows/ endpoint
+async function autoLoad() {
+  try {
+    const r = await fetch('/workflows/');
+    if (!r.ok) return;
+    const data = await r.json();
+    const files = Array.isArray(data) ? data : [];
+    for (const f of files) {
+      const name = f.Name || f.name;
+      if (!name?.endsWith('.json')) continue;
+      try {
+        const resp = await fetch('/workflows/' + name);
+        if (resp.ok) {
+          const d = await resp.json();
+          if (d.id) S.wfs[d.id] = d;
+        }
+      } catch(e) {}
+    }
+    if (Object.keys(S.wfs).length) {
+      S.sel = Object.keys(S.wfs)[0];
+      renderSidebar();
+      renderMain();
+    }
+  } catch(e) {}
+}
+
+document.getElementById('fileInput').addEventListener('change', e => loadFiles(e.target.files));
+renderSidebar();
+autoLoad();
+</script>
+</body>
+</html>

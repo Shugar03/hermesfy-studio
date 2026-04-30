@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from hermesfy.tools.workflows import get_workflow
+from hermesfy.tools.workflows import get_workflow, get_workflow_states
 
 DEFAULT_SAVE_DIR = Path.home() / ".hermes" / "hermesfy" / "workflows"
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB max
@@ -75,6 +75,7 @@ def save_workflow(workflow_id: str, filename: str | None = None) -> str:
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     # Serialize
+    node_states, node_errors, events = get_workflow_states(workflow_id)
     data = {
         "id": workflow.id,
         "name": workflow.name,
@@ -84,6 +85,12 @@ def save_workflow(workflow_id: str, filename: str | None = None) -> str:
         ],
         "edges": [{"source": e.source, "target": e.target} for e in workflow.edges],
     }
+    if node_states or events:
+        data["execution"] = {
+            "node_states": node_states,
+            "node_errors": node_errors,
+            "events": events,
+        }
 
     serialized = json.dumps(data, indent=2)
     if len(serialized) > MAX_FILE_SIZE:
