@@ -191,6 +191,18 @@ async def execute(
             config["_node_id"] = node_id
             config["_node_type"] = node.type.value
 
+        # Pass-through nodes: text_prompt and seed don't call the provider
+        PASS_THROUGH_TYPES = {NodeType.TEXT_PROMPT, NodeType.SEED}
+        if node.type in PASS_THROUGH_TYPES:
+            outputs[node_id] = config
+            node_states[node_id] = NodeState.COMPLETED
+            yield NodeEvent(
+                node_id=node_id,
+                event_type="node_complete",
+                data={"output": config},
+            )
+            continue
+
         try:
             result = await provider.generate(node.type.value, config)
             outputs[node_id] = result if result is not None else {}

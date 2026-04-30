@@ -5,7 +5,7 @@ import json
 
 from hermesfy.dag.executor import execute
 from hermesfy.rendering.canvas import render_minimal_canvas
-from hermesfy.tools.workflows import get_workflow
+from hermesfy.tools.workflows import get_workflow, set_workflow_states
 
 # Try to use FalProvider, but fall back gracefully if not possible
 try:
@@ -53,7 +53,6 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
             asyncio.run(_run())
         except Exception as exc:
             async_error = exc
-
     import threading
     thread = threading.Thread(target=_thread_target)
     thread.start()
@@ -70,8 +69,11 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
             node_errors[event.node_id] = event.data.get("error", "unknown error") if event.data else "unknown error"
         elif event.event_type == "workflow_done" and event.data:
             ns = event.data.get("node_states", {})
-            # NodeState(str, Enum) values are already strings: "completed", "failed", etc.
-            node_states = {k: str(v) for k, v in ns.items()}
+            node_states = {k: v.value if hasattr(v, 'value') else str(v) for k, v in ns.items()}
 
     canvas = render_minimal_canvas(workflow, node_states=node_states, node_errors=node_errors)
+
+    # Persist states so workflow_status can access them later
+    set_workflow_states(workflow_id, node_states, node_errors)
+
     return json.dumps({"canvas": canvas, "events_count": len(events)})

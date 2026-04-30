@@ -20,14 +20,14 @@ dev = [
     "ruff>=0.3.0",
 ]
 
-[project.entry-points.hermes]
+[project.entry-points."hermes_agent.plugins"]
 hermesfy-studio = "hermesfy.plugin:register"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-hermesfy = ["styles/*.yaml"]
+hermesfy = ["styles/*.yaml", "skills/*.md"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
