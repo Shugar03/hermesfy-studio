@@ -1,6 +1,7 @@
 # Hermesfy Studio
 
-<img width="1248" height="832" alt="Generated Image April 30, 2026 - 2_18AM" src="https://github.com/user-attachments/assets/a8300294-4a49-4e8b-a055-0ede3c3415f4" />
+<img width="1344" height="768" alt="Generated Image April 30, 2026 - 2_22AM" src="https://github.com/user-attachments/assets/bd283b8d-611e-4a7e-8025-3748d1b31fec" />
+
 
 > **Lite DAG workflow engine for Hermes Agent.** Define image generation workflows, execute them topologically via Fal.ai, edit nodes on the fly — all through natural language in your Hermes chat.
 
