@@ -2,11 +2,20 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+*.dist-info/
 dist/
 build/
 .venv/
 venv/
 env/
+
+# Testing
+.pytest_cache/
+.coverage
+*.cover
+
+# Linting
+.ruff_cache/
 
 # IDE
 .vscode/
@@ -19,3 +28,6 @@ Thumbs.db
 # Environment
 .env
 .env.*
+
+# Engram / Local SDD artifacts (not for repo)
+.atl/

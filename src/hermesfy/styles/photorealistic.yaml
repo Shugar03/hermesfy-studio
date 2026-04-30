@@ -1,0 +1,5 @@
+prompt_prefix: "photorealistic, 4k, detailed, natural lighting"
+guidance_scale: 7.5
+num_inference_steps: 35
+width: 1024
+height: 1024

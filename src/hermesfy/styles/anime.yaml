@@ -1,0 +1,5 @@
+prompt_prefix: "anime style, studio ghibli, vibrant"
+guidance_scale: 7.0
+num_inference_steps: 30
+width: 1024
+height: 1024

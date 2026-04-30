@@ -1,0 +1,6 @@
+name: hermesfy-studio
+version: 0.1.0
+description: DAG workflow engine for image generation via Fal.ai
+requires_env:
+  - FAL_API_KEY
+entry_point: hermesfy.plugin:register

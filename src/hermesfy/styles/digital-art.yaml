@@ -1,0 +1,5 @@
+prompt_prefix: "digital art, trending on artstation, concept art"
+guidance_scale: 7.0
+num_inference_steps: 35
+width: 1024
+height: 1024

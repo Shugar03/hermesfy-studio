@@ -1,0 +1,5 @@
+prompt_prefix: "cinematic, 8k, photorealistic, dramatic lighting"
+guidance_scale: 7.5
+num_inference_steps: 40
+width: 1024
+height: 1024
