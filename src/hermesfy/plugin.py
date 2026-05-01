@@ -20,7 +20,7 @@ def _on_session_start(**kwargs) -> None:
 
 
 def register(ctx) -> None:
-    """Register all 7 tools + skill + hook with the Hermes agent context."""
+    """Register all 8 tools + skill + hook with the Hermes agent context."""
 
     # Register skill for context (loadable via skill system)
     skill_path = Path(__file__).parent / "skills" / "SKILL.md"
@@ -38,6 +38,12 @@ def register(ctx) -> None:
     fal_key = os.environ.get("FAL_API_KEY")
     if not fal_key:
         logger.warning("[hermesfy] FAL_API_KEY not set — provider will use mock mode")
+
+    # Load persisted workflows from disk
+    from hermesfy.tools.workflows import load_persisted_workflows
+    loaded = load_persisted_workflows()
+    if loaded:
+        logger.info("[hermesfy] Loaded %d persisted workflows from disk", loaded)
 
     # Register 7 tools
     from hermesfy.tools.define_workflow import define_workflow, DEFINE_WORKFLOW_SCHEMA
