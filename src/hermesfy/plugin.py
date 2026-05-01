@@ -54,6 +54,7 @@ def register(ctx) -> None:
     from hermesfy.tools.save_workflow import save_workflow
     from hermesfy.tools.load_workflow import load_workflow
     from hermesfy.tools.run_agentic_workflow import run_agentic_workflow
+    from hermesfy.tools.list_templates import list_templates_tool
 
     TOOLSET = "hermesfy"
 
@@ -154,9 +155,23 @@ def register(ctx) -> None:
         },
         handler=run_agentic_workflow,
     )
+    ctx.register_tool(
+        name="hermesfy_list_templates",
+        toolset=TOOLSET,
+        description="Browse, inspect, or export pre-built workflow templates (product, lifestyle, social)",
+        schema={
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "inspect", "export"], "description": "list=all templates, inspect=details, export=JSON for define_workflow"},
+                "template_key": {"type": "string", "description": "Template key for inspect/export (e.g., 'product_studio')"},
+                "description": {"type": "string", "description": "Description to inject into {description} placeholders (export only)"},
+            },
+        },
+        handler=list_templates_tool,
+    )
 
     logger.info(
-        "[hermesfy] Registered 8 tools in toolset '%s', 1 skill (hermesfy-guide), "
+        "[hermesfy] Registered 9 tools in toolset '%s', 1 skill (hermesfy-guide), "
         "1 hook (on_session_start). %d Fal.ai models available.",
         TOOLSET,
         len(get_models()),

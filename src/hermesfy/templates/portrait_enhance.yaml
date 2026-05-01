@@ -1,0 +1,29 @@
+# Portrait Enhancement — Generate + face restore
+name: Portrait Enhance
+description: Generate a portrait or lifestyle shot, then enhance faces with CodeFormer
+category: lifestyle
+nodes:
+  - id: prompt
+    type: text_prompt
+    config:
+      prompt: "{description}, professional portrait photography, natural lighting"
+  - id: gen
+    type: image_gen
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}"
+      width: 1024
+      height: 1024
+      num_inference_steps: 28
+      guidance_scale: 3.5
+  - id: face
+    type: face_restore
+    config:
+      model: codeformer
+      image_url: "{{gen}}"
+      codeformer_fidelity: 0.5
+edges:
+  - source: prompt
+    target: gen
+  - source: gen
+    target: face

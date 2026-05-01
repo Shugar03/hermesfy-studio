@@ -1,0 +1,39 @@
+# IP-Adapter Consistency — Generate master, then create variants with same product
+name: IP-Adapter Consistency
+description: Generate a master product image, then use IP-Adapter to create consistent variants in different contexts
+category: product
+nodes:
+  - id: prompt
+    type: text_prompt
+    config:
+      prompt: "{description}, studio lighting, white background, product photography"
+  - id: master
+    type: image_gen
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}"
+      width: 1024
+      height: 1024
+      num_inference_steps: 28
+      guidance_scale: 3.5
+  - id: variant_1
+    type: ip_adapter
+    config:
+      model: flux-pro
+      prompt: "{{prompt}}, lifestyle setting, warm ambient light"
+      image_url: "{{master}}"
+      ip_adapter_weight: 0.75
+  - id: variant_2
+    type: ip_adapter
+    config:
+      model: flux-pro
+      prompt: "{{prompt}}, social media layout, gradient background"
+      image_url: "{{master}}"
+      ip_adapter_weight: 0.75
+edges:
+  - source: prompt
+    target: master
+  - source: master
+    target: variant_1
+  - source: master
+    target: variant_2

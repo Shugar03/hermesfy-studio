@@ -1,0 +1,28 @@
+# Product Photography — Studio shot with background removal
+name: Product Studio
+description: Generate a product photo on white background, then remove background for e-commerce catalog
+category: product
+nodes:
+  - id: prompt
+    type: text_prompt
+    config:
+      prompt: "{description}, white background, studio lighting, product photography"
+  - id: gen
+    type: image_gen
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}"
+      width: 1024
+      height: 1024
+      num_inference_steps: 28
+      guidance_scale: 3.5
+  - id: nobg
+    type: remove_bg
+    config:
+      model: birefnet
+      image_url: "{{gen}}"
+edges:
+  - source: prompt
+    target: gen
+  - source: gen
+    target: nobg

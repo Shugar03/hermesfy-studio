@@ -1,0 +1,36 @@
+# Clean Catalog — Generate + remove bg + upscale for e-commerce
+name: Catalog Clean
+description: "Full e-commerce pipeline: generate product, remove background, upscale to high-res"
+category: product
+nodes:
+  - id: prompt
+    type: text_prompt
+    config:
+      prompt: "{description}, white background, studio lighting, product photography, sharp focus"
+  - id: gen
+    type: image_gen
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}"
+      width: 1024
+      height: 1024
+      num_inference_steps: 28
+      guidance_scale: 3.5
+  - id: nobg
+    type: remove_bg
+    config:
+      model: birefnet
+      image_url: "{{gen}}"
+  - id: upscale
+    type: upscale
+    config:
+      model: clarity-upscaler
+      image_url: "{{nobg}}"
+      scale: 2
+edges:
+  - source: prompt
+    target: gen
+  - source: gen
+    target: nobg
+  - source: nobg
+    target: upscale

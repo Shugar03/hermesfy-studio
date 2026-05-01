@@ -1,0 +1,39 @@
+# Multi-format Export — Generate 1:1, then outpaint to 9:16 and 16:9
+name: Multi-format Export
+description: Generate a square image, then outpaint to portrait (Stories) and landscape (YouTube) formats
+category: social
+nodes:
+  - id: prompt
+    type: text_prompt
+    config:
+      prompt: "{description}, high quality, detailed"
+  - id: master
+    type: image_gen
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}"
+      width: 1024
+      height: 1024
+      num_inference_steps: 28
+      guidance_scale: 3.5
+  - id: portrait
+    type: outpaint
+    config:
+      model: flux-dev
+      image_url: "{{master}}"
+      new_width: 1024
+      new_height: 1536
+  - id: landscape
+    type: outpaint
+    config:
+      model: flux-dev
+      image_url: "{{master}}"
+      new_width: 1536
+      new_height: 1024
+edges:
+  - source: prompt
+    target: master
+  - source: master
+    target: portrait
+  - source: master
+    target: landscape

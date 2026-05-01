@@ -1,0 +1,41 @@
+# Product Variants — Generate master + lifestyle + social variants
+name: Product Variants
+description: Generate a master product image, then create lifestyle and social media variants using img2img
+category: product
+nodes:
+  - id: prompt
+    type: text_prompt
+    config:
+      prompt: "{description}, white background, studio lighting"
+  - id: master
+    type: image_gen
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}"
+      width: 1024
+      height: 1024
+      num_inference_steps: 28
+      guidance_scale: 3.5
+  - id: lifestyle
+    type: img2img
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}, lifestyle setting, warm ambient light, natural environment"
+      image_url: "{{master}}"
+      strength: 0.4
+      num_inference_steps: 28
+  - id: social
+    type: img2img
+    config:
+      model: flux-dev
+      prompt: "{{prompt}}, social media layout, gradient background, modern design"
+      image_url: "{{master}}"
+      strength: 0.45
+      num_inference_steps: 28
+edges:
+  - source: prompt
+    target: master
+  - source: master
+    target: lifestyle
+  - source: master
+    target: social
