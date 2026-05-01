@@ -55,6 +55,7 @@ def register(ctx) -> None:
     from hermesfy.tools.load_workflow import load_workflow
     from hermesfy.tools.run_agentic_workflow import run_agentic_workflow
     from hermesfy.tools.list_templates import list_templates_tool
+    from hermesfy.tools.history import history_tool
 
     TOOLSET = "hermesfy"
 
@@ -169,9 +170,27 @@ def register(ctx) -> None:
         },
         handler=list_templates_tool,
     )
+    ctx.register_tool(
+        name="hermesfy_history",
+        toolset=TOOLSET,
+        description="Query, inspect, or clear the image generation history gallery",
+        schema={
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "stats", "clear"], "description": "list=gallery, stats=summary, clear=wipe"},
+                "limit": {"type": "integer", "description": "Max entries (default 20)"},
+                "offset": {"type": "integer", "description": "Pagination offset"},
+                "model": {"type": "string", "description": "Filter by model"},
+                "pattern": {"type": "string", "description": "Filter by pattern"},
+                "tag": {"type": "string", "description": "Filter by tag"},
+                "min_score": {"type": "integer", "description": "Filter by min QA score"},
+            },
+        },
+        handler=history_tool,
+    )
 
     logger.info(
-        "[hermesfy] Registered 9 tools in toolset '%s', 1 skill (hermesfy-guide), "
+        "[hermesfy] Registered 10 tools in toolset '%s', 1 skill (hermesfy-guide), "
         "1 hook (on_session_start). %d Fal.ai models available.",
         TOOLSET,
         len(get_models()),
