@@ -827,12 +827,225 @@ body::after {
 }
 
 /* ═══ REDUCED MOTION ════════════════════════════════════ */
-@media (prefers-reduced-motion: reduce) {
+  @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══ WORKFLOW BUILDER ════════════════════════════════════ */
+.builder { max-width: 820px; }
+.builder-title {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.builder-title .accent {
+  color: var(--electric-mint);
+}
+.builder-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.builder-input {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--node-fill);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.builder-input:focus { border-color: var(--mint-deep); }
+.builder-input::placeholder { color: var(--fg-muted); }
+
+.builder-input-wide { flex: 1; min-width: 220px; }
+
+/* Dropdown */
+.dropdown-wrap { position: relative; display: inline-block; }
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--node-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  min-width: 200px;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.dropdown-menu.open { display: block; }
+.dropdown-item {
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dropdown-item:hover {
+  background: rgba(168,230,207,0.06);
+}
+.dropdown-item .dd-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Node builder card */
+.builder-node-card {
+  background: var(--node-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  position: relative;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 2px 8px rgba(0,0,0,0.2);
+}
+.builder-node-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.builder-node-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.builder-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+.builder-icon-btn:hover {
+  border-color: var(--mint-deep);
+  color: var(--foreground);
+  background: rgba(168,230,207,0.04);
+}
+.builder-icon-btn.danger:hover {
+  border-color: rgba(255,100,100,0.4);
+  color: var(--red);
+  background: var(--red-dim);
+}
+
+.builder-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.builder-fields .full-width { grid-column: 1 / -1; }
+
+.field-group { display: flex; flex-direction: column; gap: 4px; }
+.field-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.field-group textarea.builder-input {
+  resize: vertical;
+  min-height: 64px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.field-group select.builder-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%237FDBCA' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.builder-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--fg-muted);
+  font-size: 13px;
+  text-align: center;
+  gap: 8px;
+}
+.builder-empty-icon { font-size: 28px; color: var(--mint-deep); }
+
+.builder-output {
+  margin-top: 20px;
+}
+.builder-output pre {
+  background: var(--node-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--fg-dim);
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 11px;
+}
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--node-fill);
+  border: 1px solid var(--electric-mint);
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--electric-mint);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 16px rgba(0,255,198,0.1);
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
 </style>
 </head>
 <body>
@@ -851,6 +1064,7 @@ body::after {
     <div class="sidebar-header">Workflows</div>
     <div class="sidebar-list" id="workflowList"></div>
     <div class="sidebar-footer">
+      <button class="btn" style="margin-bottom:8px;" onclick="openBuilder()">✦ Create Workflow</button>
       <div class="file-input-wrap">
         <button class="btn btn-primary">+ Load JSON</button>
         <input type="file" id="fileInput" accept=".json" multiple>
@@ -1073,6 +1287,308 @@ async function autoLoad() {
     }
   } catch(e) {}
 }
+
+/* ═══════════════════════════════════════════════════════════
+   WORKFLOW BUILDER
+   ═══════════════════════════════════════════════════════════ */
+
+const NODE_TYPES = [
+  { key:'text_prompt', label:'TEXT PROMPT', defaultConfig:{prompt:""} },
+  { key:'image_gen',   label:'IMAGE GEN',   defaultConfig:{model:"flux-dev",prompt:"",width:1024,height:1024,num_inference_steps:28,guidance_scale:3.5} },
+  { key:'img2img',     label:'IMG2IMG',     defaultConfig:{model:"flux-dev",prompt:"",image_url:"",strength:0.4,num_inference_steps:28} },
+  { key:'upscale',     label:'UPSCALE',     defaultConfig:{model:"clarity-upscaler",image_url:"",scale:2} },
+  { key:'remove_bg',   label:'REMOVE BG',   defaultConfig:{model:"birefnet",image_url:""} },
+  { key:'inpaint',     label:'INPAINT',     defaultConfig:{model:"flux-dev",image_url:"",mask_url:"",prompt:""} },
+  { key:'outpaint',    label:'OUTPAINT',    defaultConfig:{model:"flux-dev",image_url:"",new_width:1024,new_height:1536} },
+  { key:'ip_adapter',  label:'IP ADAPTER',  defaultConfig:{model:"flux-pro",prompt:"",image_url:"",ip_adapter_weight:0.75} },
+  { key:'face_restore',label:'FACE RESTORE',defaultConfig:{model:"codeformer",image_url:"",codeformer_fidelity:0.5} },
+  { key:'seed',        label:'SEED',        defaultConfig:{seed:42} }
+];
+
+const MODELS = ["flux-dev","flux-pro","clarity-upscaler","birefnet","codeformer"];
+
+const B = { name:'', nodes:[], nextId:1, exportJson:null };
+
+function openBuilder() {
+  S.sel = null;
+  S.selNode = null;
+  B.name = 'My Workflow';
+  B.nodes = [];
+  B.nextId = 1;
+  B.exportJson = null;
+  renderSidebar();
+  renderBuilder();
+}
+
+function renderBuilder() {
+  const panel = document.getElementById('mainPanel');
+  const nodesHtml = B.nodes.length ? B.nodes.map((n, i) => renderBuilderNode(n, i)).join('')
+    : `<div class="builder-empty">
+         <div class="builder-empty-icon">⬡</div>
+         <div>No nodes yet — click <b style="color:var(--electric-mint)">Add Node</b> to start building</div>
+       </div>`;
+
+  const exportSection = B.exportJson ? `
+    <div class="builder-output">
+      <div class="section-label">Export Preview</div>
+      <pre id="builderExportPre">${hl(B.exportJson)}</pre>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-sm" onclick="copyExport()">📋 Copy to Clipboard</button>
+        <button class="btn btn-sm btn-primary" onclick="loadIntoSidebar()">⬇ Load into Sidebar</button>
+      </div>
+    </div>` : '';
+
+  panel.innerHTML = `
+    <div class="builder">
+      <div class="builder-title">
+        <span class="accent">✦</span> Workflow Builder
+      </div>
+
+      <div class="builder-row">
+        <div class="field-group" style="flex:1;min-width:200px;">
+          <span class="field-label">Workflow Name</span>
+          <input class="builder-input builder-input-wide" type="text" value="${escAttr(B.name)}" placeholder="My Workflow" oninput="B.name=this.value">
+        </div>
+        <div class="dropdown-wrap">
+          <button class="btn btn-primary btn-sm" onclick="toggleDropdown(event)">+ Add Node</button>
+          <div class="dropdown-menu" id="addNodeDropdown">
+            ${NODE_TYPES.map(nt => `<div class="dropdown-item" onclick="addNode('${nt.key}')">
+              ${nt.label}
+              <span class="dd-badge node-type-badge ${nt.key}">${TYPELbl[nt.key]||nt.key.toUpperCase()}</span>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      ${nodesHtml}
+
+      ${B.nodes.length ? `
+      <div class="btn-row" style="margin-top:16px;">
+        <button class="btn btn-sm btn-primary" onclick="exportWorkflow()">⬡ Export JSON</button>
+      </div>` : ''}
+
+      ${exportSection}
+    </div>`;
+
+  // close dropdown on outside click
+  document.addEventListener('click', closeDropdownHandler);
+}
+
+function renderBuilderNode(n, idx) {
+  const total = B.nodes.length;
+  const upDisabled = idx === 0;
+  const downDisabled = idx === total - 1;
+
+  let fieldsHtml = '';
+  const cfg = n.config;
+  const typeDef = NODE_TYPES.find(t => t.key === n.type);
+
+  if (n.type === 'image_gen' || n.type === 'img2img' || n.type === 'inpaint' || n.type === 'outpaint' || n.type === 'ip_adapter' || n.type === 'upscale' || n.type === 'remove_bg' || n.type === 'face_restore') {
+    // Model dropdown
+    const modelsForType = n.type === 'upscale' ? ["clarity-upscaler","real-esrgan"]
+      : n.type === 'remove_bg' ? ["birefnet","isnet"]
+      : n.type === 'face_restore' ? ["codeformer","gfpgan"]
+      : MODELS;
+    const modelVal = cfg.model || modelsForType[0];
+    fieldsHtml += `<div class="field-group">
+      <span class="field-label">Model</span>
+      <select class="builder-input" onchange="updateNodeCfg(${n.id},'model',this.value)">
+        ${modelsForType.map(m => `<option value="${m}" ${m===modelVal?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>`;
+  }
+
+  if (typeDef && 'prompt' in cfg) {
+    fieldsHtml += `<div class="field-group full-width">
+      <span class="field-label">Prompt</span>
+      <textarea class="builder-input" placeholder="Enter prompt..." oninput="updateNodeCfg(${n.id},'prompt',this.value)">${escH(cfg.prompt)}</textarea>
+    </div>`;
+  }
+
+  if (n.type === 'image_gen') {
+    fieldsHtml += fieldNum('Width', 'width', cfg.width, n.id);
+    fieldsHtml += fieldNum('Height', 'height', cfg.height, n.id);
+    fieldsHtml += fieldNum('Steps', 'num_inference_steps', cfg.num_inference_steps, n.id);
+    fieldsHtml += fieldNum('Guidance', 'guidance_scale', cfg.guidance_scale, n.id, true);
+  }
+
+  if (n.type === 'img2img') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id);
+    fieldsHtml += fieldNum('Strength', 'strength', cfg.strength, n.id, true);
+    fieldsHtml += fieldNum('Steps', 'num_inference_steps', cfg.num_inference_steps, n.id);
+  }
+
+  if (n.type === 'upscale') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id);
+    fieldsHtml += fieldNum('Scale', 'scale', cfg.scale, n.id);
+  }
+
+  if (n.type === 'remove_bg') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id, true);
+  }
+
+  if (n.type === 'inpaint') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id);
+    fieldsHtml += fieldText('Mask URL', 'mask_url', cfg.mask_url, n.id);
+  }
+
+  if (n.type === 'outpaint') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id);
+    fieldsHtml += fieldNum('New Width', 'new_width', cfg.new_width, n.id);
+    fieldsHtml += fieldNum('New Height', 'new_height', cfg.new_height, n.id);
+  }
+
+  if (n.type === 'ip_adapter') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id);
+    fieldsHtml += fieldNum('Weight', 'ip_adapter_weight', cfg.ip_adapter_weight, n.id, true);
+  }
+
+  if (n.type === 'face_restore') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id);
+    fieldsHtml += fieldNum('Fidelity', 'codeformer_fidelity', cfg.codeformer_fidelity, n.id, true);
+  }
+
+  if (n.type === 'seed') {
+    fieldsHtml += fieldNum('Seed', 'seed', cfg.seed, n.id);
+  }
+
+  const tl = TYPELbl[n.type] || n.type.toUpperCase();
+
+  return `
+    <div class="builder-node-card" data-idx="${idx}">
+      <div class="builder-node-header">
+        <span class="node-type-badge ${n.type}">${tl}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-dim);">Node ${n.id}</span>
+        <div class="builder-node-actions">
+          <button class="builder-icon-btn" title="Move up" ${upDisabled?'disabled style="opacity:0.25;cursor:default;"':''} onclick="moveNode(${n.id},-1)">▲</button>
+          <button class="builder-icon-btn" title="Move down" ${downDisabled?'disabled style="opacity:0.25;cursor:default;"':''} onclick="moveNode(${n.id},1)">▼</button>
+          <button class="builder-icon-btn danger" title="Delete" onclick="deleteNode(${n.id})">✕</button>
+        </div>
+      </div>
+      <div class="builder-fields">${fieldsHtml}</div>
+    </div>`;
+}
+
+function fieldNum(label, key, val, nodeId, isFloat) {
+  return `<div class="field-group">
+    <span class="field-label">${label}</span>
+    <input class="builder-input" type="number" ${isFloat?'step="0.01"':''} value="${val ?? ''}" onchange="updateNodeCfg(${nodeId},'${key}',${isFloat?'parseFloat(this.value)||0':'parseInt(this.value)||0'})">
+  </div>`;
+}
+
+function fieldText(label, key, val, nodeId, fullWidth) {
+  return `<div class="field-group${fullWidth?' full-width':''}">
+    <span class="field-label">${label}</span>
+    <input class="builder-input" type="text" value="${escAttr(val||'')}" placeholder="https://..." oninput="updateNodeCfg(${nodeId},'${key}',this.value)">
+  </div>`;
+}
+
+function addNode(type) {
+  const typeDef = NODE_TYPES.find(t => t.key === type);
+  if (!typeDef) return;
+  const cfg = JSON.parse(JSON.stringify(typeDef.defaultConfig));
+  B.nodes.push({ id: B.nextId++, type, config: cfg });
+  closeDropdownAll();
+  renderBuilder();
+}
+
+function deleteNode(id) {
+  B.nodes = B.nodes.filter(n => n.id !== id);
+  renderBuilder();
+}
+
+function moveNode(id, dir) {
+  const i = B.nodes.findIndex(n => n.id === id);
+  if (i < 0) return;
+  const j = i + dir;
+  if (j < 0 || j >= B.nodes.length) return;
+  [B.nodes[i], B.nodes[j]] = [B.nodes[j], B.nodes[i]];
+  renderBuilder();
+}
+
+function updateNodeCfg(id, key, val) {
+  const n = B.nodes.find(x => x.id === id);
+  if (n) n.config[key] = val;
+}
+
+function toggleDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('addNodeDropdown');
+  dd.classList.toggle('open');
+}
+
+function closeDropdownHandler(e) {
+  const dd = document.getElementById('addNodeDropdown');
+  if (dd && !dd.contains(e.target) && !e.target.closest('.dropdown-wrap')) {
+    dd.classList.remove('open');
+  }
+}
+
+function closeDropdownAll() {
+  const dd = document.getElementById('addNodeDropdown');
+  if (dd) dd.classList.remove('open');
+}
+
+function exportWorkflow() {
+  const nodes = B.nodes.map(n => ({ id: 'node_' + n.id, type: n.type, config: JSON.parse(JSON.stringify(n.config)) }));
+  const edges = [];
+  for (let i = 0; i < nodes.length - 1; i++) {
+    edges.push({ source: nodes[i].id, target: nodes[i + 1].id });
+  }
+  const wf = {
+    id: 'wf_' + Date.now(),
+    name: B.name || 'Untitled Workflow',
+    nodes,
+    edges,
+    created_at: new Date().toISOString()
+  };
+  B.exportJson = wf;
+  renderBuilder();
+  // scroll to export
+  setTimeout(() => {
+    const el = document.querySelector('.builder-output');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  }, 50);
+}
+
+function copyExport() {
+  if (!B.exportJson) return;
+  const text = JSON.stringify(B.exportJson, null, 2);
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('JSON copied to clipboard');
+  }).catch(() => {
+    showToast('Failed to copy');
+  });
+}
+
+function loadIntoSidebar() {
+  if (!B.exportJson) return;
+  const wf = B.exportJson;
+  S.wfs[wf.id] = wf;
+  S.sel = wf.id;
+  S.selNode = null;
+  B.exportJson = null;
+  renderSidebar();
+  renderMain();
+  showToast('Workflow loaded into sidebar');
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('builderToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'builderToast';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+function escAttr(s) { return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 document.getElementById('fileInput').addEventListener('change', e => loadFiles(e.target.files));
 renderSidebar();
