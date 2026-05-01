@@ -229,24 +229,6 @@ Dark-mode "Antigravity" theme — deep navy with mint/cyan neon accents, glassmo
 
 ---
 
-## Tests
-
-```bash
-python -m pytest tests/ -v
-```
-
-**144 tests** covering:
-- DAG validation and topological sort
-- Executor state transitions
-- Fal.ai provider integration
-- QA scoring and adjustment logic
-- Style preset loading
-- Workflow persistence (save/load)
-- Tool input validation
-- Canvas rendering
-
----
-
 ## Built by
 
 [sebaunsa-collab](https://github.com/sebaunsa-collab) — Hermes Agent ecosystem.

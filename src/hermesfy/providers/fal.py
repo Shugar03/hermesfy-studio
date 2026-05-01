@@ -19,7 +19,7 @@ DEFAULT_TIMEOUT = 120  # seconds
 MAX_RETRIES = 3
 
 PROVIDER_ERROR = "PROVIDER_ERROR"
-PROVIDER_AUTH="***"
+PROVIDER_AUTH = "PROVIDER_AUTH"
 
 
 # ---------------------------------------------------------------------------
