@@ -85,4 +85,7 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
     # Persist states so workflow_status can access them later
     set_workflow_states(workflow_id, node_states, node_errors, serialized_events)
 
-    return json.dumps({"canvas": canvas, "events_count": len(events)})
+    result = {"canvas": canvas, "events_count": len(events)}
+    if node_errors:
+        result["node_errors"] = node_errors
+    return json.dumps(result)

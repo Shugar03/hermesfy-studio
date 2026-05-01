@@ -1,0 +1,112 @@
+{
+  "id": "test-all-nodes-001",
+  "name": "Full Pipeline — All Node Types",
+  "description": "Test workflow exercising every supported node type: text_prompt, seed, image_gen (with LoRA), img2img, inpaint, outpaint, ip_adapter, remove_bg, face_restore, upscale",
+  "nodes": [
+    {
+      "id": "prompt",
+      "type": "text_prompt",
+      "config": {
+        "prompt": "A luxury skincare product on a marble surface, soft studio lighting, 8k product photography"
+      }
+    },
+    {
+      "id": "seed_val",
+      "type": "seed",
+      "config": {
+        "seed": 42
+      }
+    },
+    {
+      "id": "gen_base",
+      "type": "image_gen",
+      "config": {
+        "model": "flux-dev",
+        "width": 1024,
+        "height": 1024,
+        "num_inference_steps": 28,
+        "guidance_scale": 3.5,
+        "prompt": "{{prompt}}",
+        "loras": [
+          {
+            "path": "fal-ai/lora/product-photography",
+            "scale": 0.8
+          }
+        ],
+        "seed": 42
+      }
+    },
+    {
+      "id": "style_transfer",
+      "type": "ip_adapter",
+      "config": {
+        "model": "flux-pro",
+        "image_url": "{{gen_base}}",
+        "ip_adapter_weight": 0.75,
+        "style_strength_ratio": 35,
+        "prompt": "luxury skincare product, marble background, studio lighting",
+        "width": 1024,
+        "height": 1024
+      }
+    },
+    {
+      "id": "remove_bg",
+      "type": "remove_bg",
+      "config": {
+        "model": "birefnet",
+        "image_url": "{{style_transfer}}"
+      }
+    },
+    {
+      "id": "inpaint_fix",
+      "type": "inpaint",
+      "config": {
+        "model": "flux-dev",
+        "image_url": "{{remove_bg}}",
+        "mask_url": "https://example.com/masks/scratch-mask.png",
+        "prompt": "smooth pristine surface, no scratches, clean product",
+        "width": 1024,
+        "height": 1024
+      }
+    },
+    {
+      "id": "outpaint_expand",
+      "type": "outpaint",
+      "config": {
+        "model": "flux-dev",
+        "image_url": "{{inpaint_fix}}",
+        "prompt": "extended marble surface with soft shadows, product photography studio",
+        "width": 1536,
+        "height": 1024
+      }
+    },
+    {
+      "id": "face_restore",
+      "type": "face_restore",
+      "config": {
+        "model": "codeformer",
+        "image_url": "{{outpaint_expand}}",
+        "codeformer_fidelity": 0.5
+      }
+    },
+    {
+      "id": "upscale_final",
+      "type": "upscale",
+      "config": {
+        "model": "clarity-upscaler",
+        "image_url": "{{face_restore}}",
+        "scale": 2
+      }
+    }
+  ],
+  "edges": [
+    { "source": "prompt", "target": "gen_base" },
+    { "source": "seed_val", "target": "gen_base" },
+    { "source": "gen_base", "target": "style_transfer" },
+    { "source": "style_transfer", "target": "remove_bg" },
+    { "source": "remove_bg", "target": "inpaint_fix" },
+    { "source": "inpaint_fix", "target": "outpaint_expand" },
+    { "source": "outpaint_expand", "target": "face_restore" },
+    { "source": "face_restore", "target": "upscale_final" }
+  ]
+}

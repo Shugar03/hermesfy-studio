@@ -122,7 +122,7 @@ def _lookup_ref(ref: str, outputs: dict[str, Any]) -> Any:
     if len(parts) == 1:
         # "node_id" — resolve to best value
         if isinstance(node_output, dict):
-            return node_output.get("prompt", node_output.get("image_url", node_output))
+            return node_output.get("prompt", node_output.get("image_url", node_output.get("url", node_output)))
         return node_output
 
     # "node_id.field" — resolve nested key
@@ -205,6 +205,9 @@ async def execute(
 
         try:
             result = await provider.generate(node.type.value, config)
+            # Convert ImageResult objects to serializable dicts
+            if result is not None and hasattr(result, '__dict__'):
+                result = result.__dict__
             outputs[node_id] = result if result is not None else {}
             node_states[node_id] = NodeState.COMPLETED
             yield NodeEvent(

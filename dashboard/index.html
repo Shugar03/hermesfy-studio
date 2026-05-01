@@ -634,6 +634,11 @@ body::after {
 .node-type-badge.img2img { color: var(--glitch-cyan); background: rgba(0,229,255,0.1); }
 .node-type-badge.upscale { color: var(--amber); background: rgba(245,158,11,0.1); }
 .node-type-badge.seed { color: var(--fg-dim); background: rgba(230,255,249,0.05); }
+.node-type-badge.inpaint { color: #c084fc; background: rgba(192,132,252,0.1); }
+.node-type-badge.outpaint { color: #f472b6; background: rgba(244,114,182,0.1); }
+.node-type-badge.ip_adapter { color: #60a5fa; background: rgba(96,165,250,0.1); }
+.node-type-badge.remove_bg { color: #34d399; background: rgba(52,211,153,0.1); }
+.node-type-badge.face_restore { color: #fb923c; background: rgba(251,146,60,0.1); }
 
 .node-id-label {
   font-family: var(--font-mono);
@@ -865,7 +870,7 @@ body::after {
 const S = { wfs: {}, sel: null, selNode: null };
 
 const EMOJI = { pending:'\u25CB', running:'\u23F3', completed:'\u2705', failed:'\u274C', retrying:'\u27F3', quality_exhausted:'\u2620' };
-const TYPELbl = { text_prompt:'TEXT', image_gen:'GEN', img2img:'IMG2IMG', upscale:'UPSCALE', seed:'SEED' };
+const TYPELbl = { text_prompt:'TEXT', image_gen:'GEN', img2img:'IMG2IMG', upscale:'UPSCALE', seed:'SEED', inpaint:'INPAINT', outpaint:'OUTPAINT', ip_adapter:'IP-AD', remove_bg:'RM-BG', face_restore:'FACE' };
 
 function wfState(wf) {
   const ex = wf.execution;

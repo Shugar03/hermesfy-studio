@@ -20,6 +20,11 @@ class NodeType(str, Enum):
     IMG2IMG = "img2img"
     UPSCALE = "upscale"
     SEED = "seed"
+    INPAINT = "inpaint"
+    OUTPAINT = "outpaint"
+    IP_ADAPTER = "ip_adapter"
+    REMOVE_BG = "remove_bg"
+    FACE_RESTORE = "face_restore"
 
 
 # Required config fields per node type
@@ -29,6 +34,11 @@ REQUIRED_CONFIG: dict[NodeType, set[str]] = {
     NodeType.IMG2IMG: {"model", "image_url"},
     NodeType.UPSCALE: {"model", "image_url"},
     NodeType.SEED: {"seed"},
+    NodeType.INPAINT: {"model", "image_url", "mask_url"},
+    NodeType.OUTPAINT: {"model", "image_url"},
+    NodeType.IP_ADAPTER: {"model", "image_url", "ip_adapter_weight", "style_strength_ratio"},
+    NodeType.REMOVE_BG: {"model", "image_url"},
+    NodeType.FACE_RESTORE: {"model", "image_url"},
 }
 
 

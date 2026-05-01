@@ -8,7 +8,7 @@ _MODELS: list[dict] = [
         "name": "flux-dev",
         "endpoint": "fal-ai/flux/dev",
         "description": "Flux Dev — fast text-to-image generation, good for rapid iteration",
-        "supported_node_types": ["image_gen", "img2img"],
+        "supported_node_types": ["image_gen", "img2img", "inpaint", "outpaint"],
         "default_params": {
             "width": 1024,
             "height": 1024,
@@ -20,7 +20,7 @@ _MODELS: list[dict] = [
         "name": "flux-pro",
         "endpoint": "fal-ai/flux-pro",
         "description": "Flux Pro — highest quality text-to-image generation",
-        "supported_node_types": ["image_gen", "img2img"],
+        "supported_node_types": ["image_gen", "img2img", "ip_adapter"],
         "default_params": {
             "width": 1024,
             "height": 1024,
@@ -59,6 +59,22 @@ _MODELS: list[dict] = [
         "supported_node_types": ["upscale"],
         "default_params": {
             "scale": 2,
+        },
+    },
+    {
+        "name": "birefnet",
+        "endpoint": "fal-ai/birefnet",
+        "description": "BiRefNet — AI background removal, produces alpha masks",
+        "supported_node_types": ["remove_bg"],
+        "default_params": {},
+    },
+    {
+        "name": "codeformer",
+        "endpoint": "fal-ai/codeformer",
+        "description": "CodeFormer — face restoration and enhancement",
+        "supported_node_types": ["face_restore"],
+        "default_params": {
+            "codeformer_fidelity": 0.5,
         },
     },
 ]
