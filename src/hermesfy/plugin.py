@@ -47,6 +47,7 @@ def register(ctx) -> None:
     from hermesfy.tools.list_models import list_models
     from hermesfy.tools.save_workflow import save_workflow
     from hermesfy.tools.load_workflow import load_workflow
+    from hermesfy.tools.run_agentic_workflow import run_agentic_workflow
 
     TOOLSET = "hermesfy"
 
@@ -130,9 +131,26 @@ def register(ctx) -> None:
         },
         handler=load_workflow,
     )
+    ctx.register_tool(
+        name="hermesfy_run_agentic_workflow",
+        toolset=TOOLSET,
+        description="Full agentic loop: plan → execute → QA → adjust → deliver. Single tool for end-to-end image generation with optional quality control.",
+        schema={
+            "type": "object",
+            "properties": {
+                "description": {"type": "string", "description": "Natural language image description"},
+                "pattern": {"type": "string", "enum": ["simple", "upscale", "remove_bg", "variants"], "description": "Workflow pattern"},
+                "qa_enabled": {"type": "boolean", "description": "Enable QA vision review (default: true)"},
+                "max_adjustments": {"type": "integer", "description": "Max QA retry iterations (default: 3)"},
+                "seed": {"type": "integer", "description": "Optional fixed seed"},
+            },
+            "required": ["description"],
+        },
+        handler=run_agentic_workflow,
+    )
 
     logger.info(
-        "[hermesfy] Registered 7 tools in toolset '%s', 1 skill (hermesfy-guide), "
+        "[hermesfy] Registered 8 tools in toolset '%s', 1 skill (hermesfy-guide), "
         "1 hook (on_session_start). %d Fal.ai models available.",
         TOOLSET,
         len(get_models()),
