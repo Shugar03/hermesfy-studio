@@ -22,7 +22,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from engine.validator import ImageValidator
+from hermesfy.validator import ImageValidator
 
 logger = logging.getLogger("hermesfy.intermediate_validator")
 

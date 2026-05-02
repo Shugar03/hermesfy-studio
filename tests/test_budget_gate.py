@@ -1,6 +1,6 @@
 """Tests for budget_gate.py — R2: Hard Cap $0.07/flow"""
 import pytest
-from engine.budget_gate import BudgetGate, BudgetExceeded, MODEL_COSTS
+from hermesfy.budget_gate import BudgetGate, BudgetExceeded, MODEL_COSTS
 
 
 # ── Basic Gate Operations ────────────────────────────────────────────────────

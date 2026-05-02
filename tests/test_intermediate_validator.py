@@ -1,7 +1,7 @@
 """Tests for intermediate_validator.py — R4: Intermediate Validation"""
 import pytest
 from unittest.mock import MagicMock, patch
-from engine.intermediate_validator import IntermediateValidator, StepValidation
+from hermesfy.intermediate_validator import IntermediateValidator, StepValidation
 
 
 # ── Initialization ───────────────────────────────────────────────────────────
@@ -12,12 +12,12 @@ class TestInitialization:
         assert v.is_available is False
 
     def test_with_api_key(self):
-        with patch("engine.intermediate_validator.ImageValidator") as MockVal:
+        with patch("hermesfy.intermediate_validator.ImageValidator") as MockVal:
             v = IntermediateValidator(api_key="test_key")
             assert v.is_available is True
 
     def test_invalid_api_key(self):
-        with patch("engine.intermediate_validator.ImageValidator", side_effect=Exception("bad key")):
+        with patch("hermesfy.intermediate_validator.ImageValidator", side_effect=Exception("bad key")):
             v = IntermediateValidator(api_key="bad_key")
             assert v.is_available is False
 
@@ -46,7 +46,7 @@ class TestStepValidation:
             assert result.skipped is True
 
     def test_pass_when_image_path(self):
-        with patch("engine.intermediate_validator.ImageValidator") as MockVal:
+        with patch("hermesfy.intermediate_validator.ImageValidator") as MockVal:
             mock_instance = MagicMock()
             mock_instance.validate.return_value = {
                 "valid": True, "confidence": 0.9, "issues": []
@@ -63,7 +63,7 @@ class TestStepValidation:
             assert result.skipped is False
 
     def test_fail_low_confidence(self):
-        with patch("engine.intermediate_validator.ImageValidator") as MockVal:
+        with patch("hermesfy.intermediate_validator.ImageValidator") as MockVal:
             mock_instance = MagicMock()
             mock_instance.validate.return_value = {
                 "valid": False, "confidence": 0.3, "issues": ["blurry", "wrong colors"]
@@ -80,7 +80,7 @@ class TestStepValidation:
             assert "blurry" in result.issues
 
     def test_custom_min_confidence(self):
-        with patch("engine.intermediate_validator.ImageValidator") as MockVal:
+        with patch("hermesfy.intermediate_validator.ImageValidator") as MockVal:
             mock_instance = MagicMock()
             mock_instance.validate.return_value = {
                 "valid": True, "confidence": 0.75, "issues": []
@@ -94,7 +94,7 @@ class TestStepValidation:
             assert result.should_continue is False  # 0.75 < 0.8
 
     def test_error_handling_is_lenient(self):
-        with patch("engine.intermediate_validator.ImageValidator") as MockVal:
+        with patch("hermesfy.intermediate_validator.ImageValidator") as MockVal:
             mock_instance = MagicMock()
             mock_instance.validate.side_effect = Exception("API timeout")
             MockVal.return_value = mock_instance

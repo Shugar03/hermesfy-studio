@@ -1,7 +1,7 @@
 """Tests for execution_spec.py — R1: Formal JSON Contract"""
 import json
 import pytest
-from engine.execution_spec import (
+from hermesfy.execution_spec import (
     ExecutionSpec, RoutingDecision, DagStep, DagWorkflow,
     ErrorHandling, PromptMetadata, SpecValidationError,
     VALID_INTENT_CATEGORIES, VALID_ACTIONS, VALID_STEP_ACTIONS,

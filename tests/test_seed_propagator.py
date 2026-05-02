@@ -1,6 +1,6 @@
 """Tests for seed_propagator.py — R3: Seed Inheritance"""
 import pytest
-from engine.seed_propagator import SeedPropagator, SEED_SUPPORTED_MODELS, SEED_EXCLUDED_MODELS
+from hermesfy.seed_propagator import SeedPropagator, SEED_SUPPORTED_MODELS, SEED_EXCLUDED_MODELS
 
 
 # ── Seed Resolution ──────────────────────────────────────────────────────────
