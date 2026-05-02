@@ -229,6 +229,29 @@ Dark-mode "Antigravity" theme — deep navy with mint/cyan neon accents, glassmo
 
 ---
 
+## Quick Start
+
+```bash
+git clone https://github.com/sebaunsa-collab/hermesfy-studio.git
+cd hermesfy-studio
+bash setup.sh
+```
+
+The `setup.sh` script will:
+1. ✅ Install Python dependencies
+2. ✅ Create required directories (cache/, output/, logs/)
+3. ✅ Fetch the latest models from FAL.ai (48+ models)
+4. ✅ Set up a daily cron job to keep models updated
+5. ✅ Check your FAL API key
+
+Then generate your first image:
+```bash
+export FAL_KEY=your_key_here
+python3 -m engine.cli "haceme un ad de Nike con fondo negro"
+```
+
+---
+
 ## Built by
 
 [sebaunsa-collab](https://github.com/sebaunsa-collab) — Hermes Agent ecosystem.

@@ -1131,8 +1131,8 @@ function renderSidebar() {
   el.innerHTML = ids.map(id => {
     const wf = S.wfs[id], st = wfState(wf), active = S.sel===id;
     const nc = wf.nodes?.length || 0;
-    return `<div class="wf-item ${active?'active':''}" onclick="selWf('${id}')">
-      <div class="wf-name">${wf.name||'unnamed'}</div>
+    return `<div class="wf-item ${active?'active':''}" onclick="selWf('${escAttr(id)}')">
+      <div class="wf-name">${escH(wf.name||'unnamed')}</div>
       <div class="wf-meta">
         <span class="state-dot ${st}"></span>
         <span>${nc} node${nc!==1?'s':''} \u00B7 ${st}</span>
@@ -1178,28 +1178,28 @@ function renderMain() {
     const icon = s==='completed'?'\u2713':s==='failed'?'\u2717':s==='running'?'\u25B6':'\u25CB';
 
     return `${edge}
-    <div class="node-card ${s} ${sel?'selected':''}" onclick="selNode('${n.id}')">
+    <div class="node-card ${s} ${sel?'selected':''}" onclick="selNode('${escAttr(n.id)}')">
       <div class="node-top">
         <div class="node-state-icon ${s}">${icon}</div>
         <span class="node-type-badge ${n.type}">${tl}</span>
-        <span class="node-id-label">${n.id}</span>
+        <span class="node-id-label">${escH(n.id)}</span>
       </div>
       <div class="node-config-text">${fmtCfg(n.config||{})}</div>
-      ${err?`<div class="node-error-text">\u26A0 ${err.slice(0,100)}${err.length>100?'...':''}</div>`:''}
+      ${err?`<div class="node-error-text">\u26A0 ${escH(err.slice(0,100))}${err.length>100?'...':''}</div>`:''}
     </div>`;
   }).join('');
 
   const rows = ev.slice().reverse().map(e => {
     let det = '';
     if (e.data) {
-      if (e.data.error) det = e.data.error;
-      else if (e.data.output) det = JSON.stringify(e.data.output).slice(0,140);
-      else if (e.data.config) det = JSON.stringify(e.data.config).slice(0,140);
+      if (e.data.error) det = escH(e.data.error);
+      else if (e.data.output) det = escH(JSON.stringify(e.data.output).slice(0,140));
+      else if (e.data.config) det = escH(JSON.stringify(e.data.config).slice(0,140));
     }
     return `<tr>
-      <td style="opacity:0.4;white-space:nowrap;">${e.timestamp||'\u2014'}</td>
-      <td>${e.node_id||''}</td>
-      <td class="ev-type ${e.event_type}">${e.event_type||''}</td>
+      <td style="opacity:0.4;white-space:nowrap;">${escH(e.timestamp||'\u2014')}</td>
+      <td>${escH(e.node_id||'')}</td>
+      <td class="ev-type ${escAttr(e.event_type)}">${escH(e.event_type||'')}</td>
       <td class="ev-detail">${det}</td>
     </tr>`;
   }).join('');
@@ -1218,9 +1218,9 @@ function renderMain() {
 
   panel.innerHTML = `
     <div class="wf-header">
-      <h2>${wf.name||'unnamed'}</h2>
+      <h2>${escH(wf.name||'unnamed')}</h2>
       <span class="badge ${st}"><span class="badge-dot"></span>${st}</span>
-      <span class="wf-id">${wf.id||''}</span>
+      <span class="wf-id">${escH(wf.id||'')}</span>
     </div>
 
     <div class="dag-section">
@@ -1241,7 +1241,7 @@ function renderMain() {
 
     ${S.selNode?`<hr class="divider">
     <div class="dag-section">
-      <div class="section-label">Node Inspector \u2014 ${S.selNode}</div>
+      <div class="section-label">Node Inspector \u2014 ${escH(S.selNode)}</div>
       <div class="inspector">${insp}</div>
     </div>`:''}
   `;
