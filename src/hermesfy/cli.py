@@ -4,55 +4,37 @@ import sys
 import json
 import os
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 -m hermesfy.cli \"your prompt here\"")
-        print("   or: python3 -m hermesfy.cli --status <workflow_id>")
-        sys.exit(1)
+USAGE = """Usage: python3 -m hermesfy.cli [OPTIONS] "your prompt here"
 
-    # Load .env
-    from pathlib import Path
-    env_file = Path(__file__).parent.parent.parent / ".env"
-    if env_file.exists():
-        for line in env_file.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
+Options:
+  --help          Show this help message
+  --list-models   List available Fal.ai models
+  --status ID     Show workflow status by ID
+"""
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("--help", "-h"):
+        print(USAGE)
+        sys.exit(0)
 
     arg = sys.argv[1]
 
     if arg == "--status":
         if len(sys.argv) < 3:
-            print("Usage: python3 -m hermesfy.cli --status <workflow_id>")
             sys.exit(1)
-        from hermesfy.tools.workflow_status import workflow_status_tool
-        result = workflow_status_tool(sys.argv[2])
-        print(json.dumps(result, indent=2))
+        from hermesfy.tools.workflow_status import workflow_status
+        print(workflow_status(sys.argv[2]))
         return
 
     if arg == "--list-models":
         from hermesfy.providers.registry import get_models
-        models = get_models()
-        for m in models:
+        for m in get_models():
             print(f"  {m['endpoint']:50s} {m['name']}")
         return
 
-    # Default: treat as prompt → agentic workflow
-    prompt = arg
-    print(f"[hermesfy] Running agentic workflow: {prompt}")
-
+    # Default: agentic workflow
     from hermesfy.tools.run_agentic_workflow import run_agentic_workflow
-    result = run_agentic_workflow(prompt=prompt)
-
-    if result.get("success"):
-        print(f"\n✅ Done! {len(result.get('images', []))} image(s) generated.")
-        for img in result.get("images", []):
-            print(f"  → {img}")
-    else:
-        print(f"\n❌ Failed: {result.get('error', 'unknown')}")
-        sys.exit(1)
-
+    print(run_agentic_workflow(description=arg))
 
 if __name__ == "__main__":
     main()

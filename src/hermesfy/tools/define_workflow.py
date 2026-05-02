@@ -1,6 +1,9 @@
 """Tool: hermesfy_define_workflow — create and store a new workflow from JSON nodes/edges."""
 
 import json
+import logging
+logger = logging.getLogger(__name__)
+
 import uuid
 
 from hermesfy.dag.graph import Edge, Node, NodeType, Workflow, validate_workflow
@@ -42,6 +45,7 @@ DEFINE_WORKFLOW_SCHEMA = {
 
 def define_workflow(nodes: list[dict], edges: list[dict], name: str | None = None) -> str:
     """Define a workflow from nodes and edges, store it, return workflow_id + canvas.
+    logger.info("[hermesfy:define_workflow] Called")
 
     Args:
         nodes: List of node dicts with id, type, config.
