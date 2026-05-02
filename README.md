@@ -71,7 +71,7 @@ hermesfy-studio/
 │   ├── intermediate_validator.py  # V4: Step-by-step validation
 │   └── plugin.py             # Hermes plugin registration
 ├── dashboard/                # Web dashboard (Antigravity theme)
-├── tests/                    # 203 tests, all green
+├── tests/                    # 312 tests, all green
 ├── setup.sh                  # One-command setup
 ├── SPEC_V3.md                # V3 Spec (Intent Router, Versions, Edit)
 └── SPEC_V4.md                # V4 Spec (Protocol-Driven Execution)
@@ -278,7 +278,7 @@ Dark-mode "Antigravity" theme — deep navy with mint/cyan neon accents, glassmo
 
 ```bash
 python3 -m pytest tests/ -v
-# 203 passed
+# 312 passed
 ```
 
 ---
