@@ -219,7 +219,7 @@ cd dashboard && python3 -m http.server 8090
 
 ## Built by
 
-[sebaunsa-collab](https://github.com/sebaunsa-collab) — part of the [Hermes](https://github.com/sebaunsa-collab/hermes-agent) ecosystem.
+[Shugar03](https://github.com/Shugar03) — part of the [Hermes](https://github.com/sebaunsa-collab/hermes-agent) ecosystem.
 
 ---
 
