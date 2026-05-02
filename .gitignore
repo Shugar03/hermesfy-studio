@@ -28,6 +28,7 @@ Thumbs.db
 # Environment
 .env
 .env.*
+!.env.example
 
 # Engram / Local SDD artifacts (not for repo)
 .atl/

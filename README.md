@@ -238,16 +238,24 @@ bash setup.sh
 ```
 
 The `setup.sh` script will:
-1. ✅ Install Python dependencies
-2. ✅ Create required directories (cache/, output/, logs/)
-3. ✅ Fetch the latest models from FAL.ai (48+ models)
-4. ✅ Set up a daily cron job to keep models updated
-5. ✅ Check your FAL API key
+1. ✅ Create a Python virtual environment
+2. ✅ Install hermesfy-studio in editable mode (with all deps)
+3. ✅ Create required directories (cache/, output/, logs/)
+4. ✅ Create `.env` file (edit with your FAL API key)
+5. ✅ Fetch the latest models from FAL.ai
+6. ✅ Show dashboard instructions
 
 Then generate your first image:
 ```bash
-export FAL_KEY=your_key_here
-python3 -m engine.cli "haceme un ad de Nike con fondo negro"
+source venv/bin/activate
+export FAL_API_KEY=your_key_here
+python3 -m hermesfy.cli "haceme un ad de Nike con fondo negro"
+```
+
+**Dashboard** (optional):
+```bash
+cd dashboard && python3 -m http.server 8090
+# Open http://localhost:8090
 ```
 
 ---
