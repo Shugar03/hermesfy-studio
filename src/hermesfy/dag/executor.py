@@ -1,12 +1,26 @@
-"""Async DAG executor using Kahn's topological sort and sequential node execution."""
+"""Async DAG executor using Kahn's topological sort and sequential node execution.
+
+V4 Integration: ExecutionSpec, BudgetGate, SeedPropagator, IntermediateValidator.
+"""
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 from typing import Any, AsyncGenerator, Optional
 
 from hermesfy.dag.graph import Edge, Node, NodeType, Workflow, CYCLE_DETECTED
 from hermesfy.dag.state import NodeEvent, NodeRun, NodeState
+
+# V4 modules
+from hermesfy.execution_spec import ExecutionSpec, SpecValidationError
+from hermesfy.budget_gate import BudgetGate, BudgetExceeded, MODEL_COSTS
+from hermesfy.seed_propagator import SeedPropagator
+from hermesfy.intermediate_validator import IntermediateValidator
+from hermesfy.model_selector import ModelSelector, AdType, QualityLevel
+from hermesfy.intent_router import IntentRouter
+logger = logging.getLogger("hermesfy.executor")
 
 # Re-export for test visibility
 __all__ = ["execute", "_topological_sort", "_resolve_inputs"]
@@ -140,20 +154,84 @@ async def execute(
 ) -> AsyncGenerator[NodeEvent, None]:
     """Execute a workflow, yielding NodeEvents for each state transition.
 
-    Uses Kahn's algorithm for topological sort, then executes nodes sequentially.
-    Single node failures do not crash the workflow — the node is marked as failed
-    and subsequent nodes continue.
+    V4 Integration:
+    - ExecutionSpec: Validates workflow before execution (if spec provided)
+    - BudgetGate: Enforces $0.07/flow spending cap (unless disabled)
+    - SeedPropagator: Propagates seeds between nodes for consistency
+    - IntermediateValidator: Validates outputs between generative steps
 
     Args:
         workflow: The Workflow to execute.
         provider: An object with an async generate(node_type, config) → dict method.
-        options: Optional execution flags (e.g., resolve_inputs: bool).
+        options: Optional execution flags:
+            - resolve_inputs: bool (default True)
+            - spec: ExecutionSpec for pre-validation (optional)
+            - budget: float max budget in USD (default 0.07, None to disable)
+            - validate_steps: bool validate intermediate outputs (default False)
+            - gemini_api_key: str for intermediate validation (optional)
+            - prompt: str original user prompt for validation (optional)
 
     Yields:
         NodeEvent objects for each state change.
     """
     options = options or {}
     resolve_inputs = options.get("resolve_inputs", True)
+
+    # ── V4: ExecutionSpec validation ───────────────────────────────────────
+    spec = options.get("spec")
+    if spec is not None:
+        if not isinstance(spec, ExecutionSpec):
+            try:
+                spec = ExecutionSpec.from_dict(spec) if isinstance(spec, dict) else spec
+            except Exception as e:
+                logger.warning("Invalid ExecutionSpec, skipping validation: %s", e)
+                spec = None
+
+        if spec is not None:
+            errors = spec.validate()
+            if errors:
+                yield NodeEvent(
+                    node_id="__workflow__",
+                    event_type="workflow_error",
+                    data={"error": f"ExecutionSpec validation failed: {errors}"},
+                )
+                return
+            logger.info("ExecutionSpec validated OK (target_model=%s, budget=$%.4f)",
+                        spec.target_model, spec.total_budget)
+
+    # ── V4: BudgetGate setup ───────────────────────────────────────────────
+    budget_limit = options.get("budget", 0.07)
+    budget_gate: BudgetGate | None = None
+    if budget_limit is not None:
+        budget_gate = BudgetGate(max_budget=budget_limit)
+        logger.info("BudgetGate initialized: $%.4f cap", budget_limit)
+
+    # ── V4: SeedPropagator setup ──────────────────────────────────────────
+    seed_propagator = SeedPropagator()
+
+    # ── V4: IntermediateValidator setup ────────────────────────────────────
+    intermediate_validator: IntermediateValidator | None = None
+    gemini_key = options.get("gemini_api_key") or os.environ.get("GOOGLE_API_KEY")
+    if options.get("validate_steps") and gemini_key:
+        intermediate_validator = IntermediateValidator(api_key=gemini_key)
+        logger.info("IntermediateValidator enabled (min_confidence=%.2f)",
+                     intermediate_validator.min_confidence)
+
+    # Original prompt for validation
+    original_prompt = options.get("prompt", "")
+
+    # ── V4: ModelSelector setup ────────────────────────────────────────────
+    model_selector = ModelSelector()
+    ad_type_str = options.get("ad_type", "product_hero")
+    try:
+        ad_type = AdType(ad_type_str)
+    except ValueError:
+        ad_type = AdType.PRODUCT_HERO
+    quality_str = options.get("quality", "balanced")
+    try:
+        quality = QualityLevel(quality_str)
+    except ValueError:
+        quality = QualityLevel.STANDARD
 
     # Topological sort
     order = _topological_sort(workflow)
@@ -203,6 +281,43 @@ async def execute(
             )
             continue
 
+        # ── V4: Seed propagation ──────────────────────────────────────────
+        model = config.get("model", "")
+
+        # ── V4: Auto-select model if not specified ────────────────────────
+        if not model and node.type.value in ("image_gen", "img2img"):
+            model = model_selector.select(ad_type=ad_type, quality=quality)
+            config["model"] = model
+            logger.info("Auto-selected model: %s for node %s (ad_type=%s, quality=%s)",
+                         model, node_id, ad_type.value, quality.value)
+
+        if node.type.value in ("image_gen", "img2img"):
+            requested_seed = config.get("seed", -1)
+            resolved_seed = seed_propagator.resolve_seed(requested_seed)
+            config = seed_propagator.propagate(resolved_seed, config, model)
+            logger.debug("Seed propagated: %d for node %s (model=%s)",
+                         resolved_seed, node_id, model)
+
+        # ── V4: Budget gate check ─────────────────────────────────────────
+        if budget_gate is not None and model:
+            estimated_cost = budget_gate.estimate_cost(model)
+            if not budget_gate.can_spend(estimated_cost):
+                node_states[node_id] = NodeState.FAILED
+                outputs[node_id] = None
+                error_msg = (
+                    f"Budget exceeded: ${budget_gate.remaining():.4f} remaining, "
+                    f"${estimated_cost:.4f} needed for {model}"
+                )
+                logger.warning("BudgetGate BLOCKED node %s: %s", node_id, error_msg)
+                yield NodeEvent(
+                    node_id=node_id,
+                    event_type="node_error",
+                    data={"error": error_msg, "budget_exceeded": True},
+                )
+                continue
+            # Record the spend optimistically (will be refunded on failure)
+            budget_gate.record_spend(estimated_cost, model=model, detail=node_id)
+
         try:
             result = await provider.generate(node.type.value, config)
             # Convert ImageResult objects to serializable dicts
@@ -210,6 +325,34 @@ async def execute(
                 result = result.__dict__
             outputs[node_id] = result if result is not None else {}
             node_states[node_id] = NodeState.COMPLETED
+
+            # ── V4: Intermediate validation ───────────────────────────────
+            if (intermediate_validator is not None
+                    and node.type.value in ("image_gen", "img2img")
+                    and original_prompt):
+                validation = intermediate_validator.validate_step(
+                    step_result=outputs[node_id],
+                    original_prompt=original_prompt,
+                    step_action=node.type.value,
+                )
+                if not validation.should_continue:
+                    node_states[node_id] = NodeState.FAILED
+                    outputs[node_id] = None
+                    error_msg = (
+                        f"Intermediate validation failed: "
+                        f"confidence={validation.confidence:.2f}, "
+                        f"issues={validation.issues}"
+                    )
+                    logger.warning("IntermediateValidator BLOCKED node %s: %s",
+                                   node_id, error_msg)
+                    yield NodeEvent(
+                        node_id=node_id,
+                        event_type="node_error",
+                        data={"error": error_msg, "validation_failed": True,
+                              "confidence": validation.confidence},
+                    )
+                    continue
+
             yield NodeEvent(
                 node_id=node_id,
                 event_type="node_complete",
@@ -224,4 +367,11 @@ async def execute(
                 data={"error": str(exc)},
             )
 
-    yield NodeEvent(node_id="__workflow__", event_type="workflow_done", data={"node_states": node_states})
+    # ── V4: Workflow done with budget summary ──────────────────────────────
+    done_data: dict[str, Any] = {"node_states": node_states}
+    if budget_gate is not None:
+        done_data["budget"] = budget_gate.get_summary()
+        logger.info("Workflow done. Budget: $%.4f / $%.4f spent",
+                     budget_gate.spent, budget_gate.max_budget)
+
+    yield NodeEvent(node_id="__workflow__", event_type="workflow_done", data=done_data)
