@@ -16,216 +16,12 @@ Most AI image generation tools give you a text box and a "generate" button. That
 - **Multi-step pipelines** — generate → upscale → remove background → deliver
 - **Iterative refinement** — generate, evaluate with vision AI, adjust prompt, regenerate
 - **Consistent style** — apply cinematic/anime/photorealistic presets across entire batches
+- **Budget control** — hard spending cap per flow ($0.07 default)
+- **Seed consistency** — automatic seed inheritance between pipeline steps
 
 Hermesfy turns these into composable DAG workflows. Each node is a step. Each edge is a data dependency. The engine resolves the graph, executes in parallel where possible, and delivers results when done.
 
 The key insight: **the LLM becomes the workflow designer**. You describe what you want in plain English. Hermes builds the DAG, executes it, and shows you the results — all without you touching a single node configuration.
-
----
-
-## What's Inside
-
-```
-hermesfy-studio/
-├── src/hermesfy/
-│   ├── dag/              # Core engine
-│   │   ├── graph.py      # DAG definition, validation, Kahn's algo
-│   │   ├── executor.py   # Topological execution engine
-│   │   ├── state.py      # Node state tracking (pending → running → done/error)
-│   │   └── quality.py    # QA scoring + auto-adjustment logic
-│   ├── providers/
-│   │   └── fal.py        # Fal.ai HTTP provider (flux, upscale, img2img)
-│   ├── tools/            # 8 Hermes Agent tools
-│   ├── styles/           # YAML style presets (cinematic, anime, etc.)
-│   ├── persistence/      # Workflow save/load (JSON)
-│   └── plugin.py         # Hermes plugin registration
-├── tests/                # 144 tests, 100% green
-├── DESIGN.md             # UI design system (Antigravity theme)
-└── dashboard/            # Web dashboard (server + static)
-```
-
----
-
-## Tools
-
-Hermesfy registers **8 tools** with Hermes Agent. The LLM calls them automatically when you describe what you want.
-
-| Tool | Description |
-|------|-------------|
-| `hermesfy_define_workflow` | Build a DAG from natural language description |
-| `hermesfy_execute_workflow` | Execute the workflow topologically via Fal.ai |
-| `hermesfy_workflow_status` | Text canvas with node states (○ ⏳ ✅ ❌ 🔄) |
-| `hermesfy_edit_node` | Edit a node's config and optionally re-execute |
-| `hermesfy_list_models` | List all available Fal.ai models |
-| `hermesfy_save_workflow` | Save workflow to a JSON file |
-| `hermesfy_load_workflow` | Load workflow from a JSON file |
-| **`hermesfy_run_agentic_workflow`** | **Full agentic loop: plan → execute → QA → adjust → deliver** |
-
-The last one — `run_agentic_workflow` — is the flagship. It takes a plain-English description, builds a workflow from predefined patterns, executes it, runs Gemini vision QA on every output, and automatically adjusts prompts if quality scores drop below threshold. One tool, zero manual steps.
-
----
-
-## Quick Start
-
-```bash
-# Install from GitHub
-pip install git+https://github.com/sebaunsa-collab/hermesfy-studio.git
-
-# Set your Fal.ai API key
-export FAL_API_KEY=your_key_here
-
-# Verify everything works
-python -m pytest tests/ -v
-# Expected: 144 passed
-```
-
----
-
-## Usage
-
-### Agentic (recommended)
-
-Just tell Hermes what you want:
-
-> *"Generate a photo of a luxury skincare bottle on marble, white background, remove the background when done"*
-
-Hermes calls `hermesfy_run_agentic_workflow` with the `remove_bg` pattern. It handles everything:
-
-1. **Plan** — selects the right workflow pattern + model
-2. **Execute** — generates the image via Fal.ai
-3. **QA** — Gemini 2.5 Flash analyzes the result (prompt adherence, quality, commercial viability)
-4. **Adjust** — if score < 7/10, rewrites the prompt and re-generates
-5. **Deliver** — returns the final image URL + QA history
-
-### Manual (for power users)
-
-Build the DAG yourself:
-
-```python
-# Define a workflow
-hermesfy_define_workflow(
-    nodes=[
-        {"id": "prompt", "type": "text_prompt", "config": {"prompt": "cyberpunk city at night"}},
-        {"id": "gen", "type": "image_gen", "config": {"model": "flux-dev", "width": 1024, "height": 1024}},
-        {"id": "upscale", "type": "upscale", "config": {"model": "clarity-upscaler", "scale": 2}},
-    ],
-    edges=[
-        {"source": "prompt", "target": "gen"},
-        {"source": "gen", "target": "upscale"},
-    ]
-)
-
-# Execute it
-hermesfy_execute_workflow()
-
-# Check status
-hermesfy_workflow_status()
-# ┌─────────────────────────────┐
-# │  prompt ✅  →  gen ⏳  →  upscale ○  │
-# └─────────────────────────────┘
-```
-
----
-
-## Workflow Patterns
-
-The agentic workflow comes with 4 built-in patterns:
-
-| Pattern | Pipeline | Use Case |
-|---------|----------|----------|
-| `simple` | text → image_gen | Quick single image |
-| `upscale` | text → image_gen → upscale | High-res output |
-| `remove_bg` | text → image_gen → remove_bg | E-commerce, product photos |
-| `variants` | text → image_gen → img2img (×2) | Style variations from a master |
-
----
-
-## Node Types
-
-| Type | Purpose |
-|------|---------|
-| `text_prompt` | Input prompt for generation |
-| `image_gen` | Generate image via Fal.ai (flux-dev, flux-schnell, etc.) |
-| `img2img` | Image-to-image transformation |
-| `upscale` | Upscale via Fal.ai clarity-upscaler |
-| `remove_bg` | Background removal via Fal.ai |
-| `seed` | Fixed seed for reproducible generation |
-
----
-
-## QA Engine
-
-Every image goes through automated quality analysis:
-
-- **Vision model**: Gemini 2.5 Flash (or compatible)
-- **Scoring**: prompt adherence (1-10), technical quality (1-10), commercial viability (1-10)
-- **Threshold**: composite score < 7 triggers auto-adjustment
-- **Loop**: max 3 iterations with prompt refinement between each
-- **History**: full QA log preserved for each execution
-
----
-
-## Style Presets
-
-```yaml
-# Available: cinematic, anime, photorealistic, digital-art
-# Applied automatically or manually:
-
-hermesfy_define_workflow(..., style="cinematic")
-```
-
-Each preset injects style-specific prompt modifiers and recommended model parameters.
-
----
-
-## Dashboard
-
-A web dashboard for visual workflow management:
-
-```bash
-cd dashboard/
-python server.py
-# Opens at http://localhost:8080
-```
-
-Dark-mode "Antigravity" theme — deep navy with mint/cyan neon accents, glassmorphism panels, CRT scanline aesthetic.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│              Hermes Agent (LLM)                  │
-│         Interprets natural language              │
-│         Calls tools automatically                │
-└───────────┬─────────────────────┬───────────────┘
-            │                     │
-   ┌────────▼────────┐  ┌────────▼────────────┐
-   │  8 Hermes Tools  │  │  Agentic Workflow   │
-   │  define/execute/ │  │  plan → execute →   │
-   │  status/edit/... │  │  QA → adjust →      │
-   └────────┬────────┘  │  deliver             │
-            │           └────────┬────────────┘
-   ┌────────▼────────────────────▼──────────────┐
-   │           DAG Engine (Kahn's algo)          │
-   │     graph.py → executor.py → state.py      │
-   └────────────────────┬──────────────────────┘
-                        │
-   ┌────────────────────▼──────────────────────┐
-   │         Fal.ai Provider (HTTP)             │
-   │   flux-dev · clarity-upscaler · img2img    │
-   └────────────────────────────────────────────┘
-```
-
----
-
-## Requirements
-
-- Python 3.10+
-- Hermes Agent (latest)
-- Fal.ai API key ([get one here](https://fal.ai))
-- Gemini API key (for QA features, optional)
 
 ---
 
@@ -242,7 +38,7 @@ The `setup.sh` script will:
 2. ✅ Install hermesfy-studio in editable mode (with all deps)
 3. ✅ Create required directories (cache/, output/, logs/)
 4. ✅ Create `.env` file (edit with your FAL API key)
-5. ✅ Fetch the latest models from FAL.ai
+5. ✅ Fetch the latest models from FAL.ai (48+ models)
 6. ✅ Show dashboard instructions
 
 Then generate your first image:
@@ -252,10 +48,237 @@ export FAL_API_KEY=your_key_here
 python3 -m hermesfy.cli "haceme un ad de Nike con fondo negro"
 ```
 
-**Dashboard** (optional):
+---
+
+## What's Inside
+
+```
+hermesfy-studio/
+├── src/hermesfy/
+│   ├── dag/                  # Core engine
+│   │   ├── graph.py          # DAG definition, validation, Kahn's algo
+│   │   ├── executor.py       # Topological execution engine
+│   │   ├── state.py          # Node state tracking
+│   │   └── quality.py        # QA scoring + auto-adjustment
+│   ├── providers/
+│   │   └── fal.py            # Fal.ai HTTP provider
+│   ├── tools/                # 10 Hermes Agent tools
+│   ├── styles/               # YAML style presets
+│   ├── persistence/          # Workflow save/load (JSON)
+│   ├── execution_spec.py     # V4: Formal JSON contract for generation
+│   ├── budget_gate.py        # V4: Hard spending cap ($0.07/flow)
+│   ├── seed_propagator.py    # V4: Seed inheritance between nodes
+│   ├── intermediate_validator.py  # V4: Step-by-step validation
+│   └── plugin.py             # Hermes plugin registration
+├── dashboard/                # Web dashboard (Antigravity theme)
+├── tests/                    # 203 tests, all green
+├── setup.sh                  # One-command setup
+├── SPEC_V3.md                # V3 Spec (Intent Router, Versions, Edit)
+└── SPEC_V4.md                # V4 Spec (Protocol-Driven Execution)
+```
+
+---
+
+## V4: Protocol-Driven Execution
+
+The latest version formalizes the contract between the LLM and the backend:
+
+### ExecutionSpec — JSON Schema
+Every generation request is a validated JSON contract. The pipeline rejects anything non-conforming.
+
+```python
+from engine.execution_spec import ExecutionSpec
+
+# Simple single-step
+spec = ExecutionSpec.simple("professional photo of Nike sneaker")
+
+# Draft → Refine (2-step)
+spec = ExecutionSpec.draft_then_refine("luxury skincare bottle")
+
+# Full control
+spec = ExecutionSpec.from_dict({
+    "routing_decision": {
+        "intent_category": "product",
+        "action": "generate",
+        "target_model": "fal-ai/flux/dev",
+        "budget_estimation": 0.045,
+        "priority": "quality"
+    },
+    "dag_workflow": {
+        "steps": [
+            {"node_id": 1, "action": "base_generation", "model": "fal-ai/flux/schnell", "params": {"width": 1024, "height": 1024}},
+            {"node_id": 2, "action": "latent_refiner", "model": "fal-ai/flux/1.1-pro", "params": {"denoising_strength": 0.35}}
+        ]
+    },
+    "prompt_metadata": {"cleaned_prompt": "luxury skincare bottle on marble"}
+})
+```
+
+### Budget Gate — Cost Control
+Hard cap per flow. Every FAL.ai call passes through the gate before execution.
+
+```python
+from engine.budget_gate import BudgetGate, BudgetExceeded
+
+gate = BudgetGate(max_budget=0.07)
+if gate.record_and_check("fal-ai/flux/schnell"):  # $0.003
+    # ... generate ...
+    gate.record_and_check("fal-ai/flux/1.1-pro")  # $0.04
+else:
+    raise BudgetExceeded(gate.remaining(), cost)
+```
+
+### Seed Propagation — Consistency Between Steps
+The seed from node 1 is automatically inherited by node 2+. No wasted credits on inconsistent compositions.
+
+```python
+from engine.seed_propagator import SeedPropagator
+
+prop = SeedPropagator()
+seed = prop.resolve_seed(-1)           # auto-generate
+params = prop.propagate(seed, {...})   # inject seed into next step
+```
+
+### Intermediate Validation — Validate Between Nodes
+After each generation step, validate the image before proceeding. Bad images get caught early.
+
+```python
+from engine.intermediate_validator import IntermediateValidator
+
+validator = IntermediateValidator(api_key="gemini_key")
+result = validator.validate_step(
+    step_result={"image_path": "/cache/fal/gen_xxx.png"},
+    original_prompt="professional photo of sneaker",
+)
+if not result.should_continue:
+    # Abort — don't waste credits on next step
+```
+
+---
+
+## Tools
+
+Hermesfy registers **10 tools** with Hermes Agent:
+
+| Tool | Description |
+|------|-------------|
+| `hermesfy_define_workflow` | Build a DAG from natural language |
+| `hermesfy_execute_workflow` | Execute topologically via Fal.ai |
+| `hermesfy_workflow_status` | Node states (○ ⏳ ✅ ❌ 🔄) |
+| `hermesfy_edit_node` | Edit a node's config |
+| `hermesfy_list_models` | List available Fal.ai models |
+| `hermesfy_list_templates` | List workflow templates |
+| `hermesfy_save_workflow` | Save workflow to JSON |
+| `hermesfy_load_workflow` | Load workflow from JSON |
+| `hermesfy_history` | View generation history |
+| **`hermesfy_run_agentic_workflow`** | **Full agentic loop: plan → execute → QA → adjust → deliver** |
+
+---
+
+## Usage
+
+### Agentic (recommended)
+
+Just tell Hermes what you want:
+
+> *"Generate a photo of a luxury skincare bottle on marble, white background, remove the background when done"*
+
+Hermes calls `hermesfy_run_agentic_workflow`. It handles everything:
+
+1. **Plan** — selects the right workflow pattern + model
+2. **Execute** — generates the image via Fal.ai
+3. **QA** — Gemini Vision analyzes the result
+4. **Adjust** — if quality < threshold, rewrites prompt and re-generates
+5. **Deliver** — returns the final image + QA history
+
+### Manual (for power users)
+
+```python
+hermesfy_define_workflow(
+    nodes=[
+        {"id": "prompt", "type": "text_prompt", "config": {"prompt": "cyberpunk city at night"}},
+        {"id": "gen", "type": "image_gen", "config": {"model": "flux-dev", "width": 1024, "height": 1024}},
+        {"id": "upscale", "type": "upscale", "config": {"model": "clarity-upscaler", "scale": 2}},
+    ],
+    edges=[
+        {"source": "prompt", "target": "gen"},
+        {"source": "gen", "target": "upscale"},
+    ]
+)
+hermesfy_execute_workflow()
+```
+
+---
+
+## Dashboard
+
+A web dashboard for visual workflow management:
+
 ```bash
 cd dashboard && python3 -m http.server 8090
 # Open http://localhost:8090
+```
+
+Dark-mode "Antigravity" theme — deep navy with mint/cyan neon accents, glassmorphism panels, CRT scanline aesthetic.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Hermes Agent (LLM)                      │
+│             Interprets natural language                  │
+│             Calls tools automatically                    │
+└───────────┬─────────────────────┬───────────────────────┘
+            │                     │
+   ┌────────▼────────┐  ┌────────▼────────────────┐
+   │  10 Hermes Tools │  │  Agentic Workflow       │
+   │  define/execute/ │  │  plan → execute →       │
+   │  status/edit/... │  │  QA → adjust → deliver  │
+   └────────┬────────┘  └────────┬────────────────┘
+            │                     │
+   ┌────────▼─────────────────────▼──────────────┐
+   │         ExecutionSpec (V4 JSON Contract)     │
+   │   BudgetGate → SeedPropagator → Validator    │
+   └────────────────────┬───────────────────────┘
+                        │
+   ┌────────────────────▼──────────────────────┐
+   │           DAG Engine (Kahn's algo)         │
+   │     graph.py → executor.py → state.py     │
+   └────────────────────┬──────────────────────┘
+                        │
+   ┌────────────────────▼──────────────────────┐
+   │         Fal.ai Provider (HTTP)             │
+   │   flux-dev · clarity-upscaler · img2img    │
+   └────────────────────────────────────────────┘
+```
+
+---
+
+## Specs
+
+| Version | Focus | Status |
+|---------|-------|--------|
+| [SPEC_V3.md](SPEC_V3.md) | Intent Router, Version History, Edit Preservation | ✅ Implemented |
+| [SPEC_V4.md](SPEC_V4.md) | ExecutionSpec, Budget Gate, Seed Inheritance, Intermediate Validation | ✅ Implemented |
+
+---
+
+## Requirements
+
+- Python 3.10+
+- Hermes Agent (latest)
+- Fal.ai API key ([get one here](https://fal.ai))
+- Gemini API key (for QA/validation features, optional)
+
+---
+
+## Tests
+
+```bash
+python3 -m pytest tests/ -v
+# 203 passed
 ```
 
 ---
