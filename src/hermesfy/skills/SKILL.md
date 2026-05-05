@@ -26,6 +26,36 @@ Natural Language → DAG Definition → Execute → Quality Gates → Edit/Re-ru
 | `hermesfy_list_models` | Browse all available Fal.ai models |
 | `hermesfy_save_workflow` | Save workflow to a JSON file for later |
 | `hermesfy_load_workflow` | Load a previously saved workflow |
+| `hermesfy_reference_analyze` | Analyze a reference image → StructuredSpec (VRH Fase 1) |
+
+## VRH Pipeline (Visual Reference Harness)
+
+Hermesfy puede analizar una imagen de referencia y generar prompts estructurados
+que preservan el estilo, layout, paleta, iluminación y composición exactos.
+
+```
+[Telegram img] → VisualAnalyzer → StructuredSpec
+                                      ↓
+                               Goldilocks Rule (fidelity dinámico)
+                                      ↓
+                               Preview (mostrar al usuario)
+                                      ↓
+                               SpecBridge → ExecutionSpec → DAG → Fal.ai → Delivery
+```
+
+### Skills VRH
+
+- **[hermesfy-spec-bridge](hermesfy-spec-bridge.md)** — Traduce StructuredSpec a ExecutionSpec (prompt estructurado + parámetros de generación)
+- **[hermesfy-goldilocks-rule](hermesfy-goldilocks-rule.md)** — Fidelity dinámico según keywords del usuario ("exactamente igual" → 0.95, "ignorá" → 0.25)
+- **[hermesfy-vrh-preview](hermesfy-vrh-preview.md)** — Preview del spec antes de generar para validación del usuario
+
+### Módulo `reference/`
+
+El código está en `src/hermesfy/reference/`:
+- `visual_analyzer.py` — StructuredSpec dataclass + VisionAnalyzer + JSON parser
+- `spec_bridge.py` — SpecBridge con Goldilocks Rule + preview_text()
+- `delivery.py` — Maneja la entrega del resultado generado
+- `templates/vision_prompt.md` — Template del prompt de visión para analizar imágenes
 
 ## Node Types
 
