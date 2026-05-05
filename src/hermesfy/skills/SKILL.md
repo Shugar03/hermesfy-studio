@@ -27,6 +27,7 @@ Natural Language → DAG Definition → Execute → Quality Gates → Edit/Re-ru
 | `hermesfy_save_workflow` | Save workflow to a JSON file for later |
 | `hermesfy_load_workflow` | Load a previously saved workflow |
 | `hermesfy_reference_analyze` | Analyze a reference image → StructuredSpec (VRH Fase 1) |
+| `hermesfy_moodboard` | Build curated moodboards from Pinterest/boards + brand merge → MOOD_SPEC |
 
 ## VRH Pipeline (Visual Reference Harness)
 
@@ -58,6 +59,46 @@ El código está en `src/hermesfy/reference/`:
 - `spec_bridge.py` — SpecBridge con Goldilocks Rule + preview_text()
 - `delivery.py` — Maneja la entrega del resultado generado
 - `templates/vision_prompt.md` — Template del prompt de visión para analizar imágenes
+
+## Moodboard Engine
+
+Hermesfy puede construir **moodboards visuales estructurados** a partir de referencias curadas
+(Pinterest, boards, imágenes subidas) y convertirlos en un **MOOD_SPEC** que guía la generación
+con coherencia estética + manual de marca.
+
+```
+[Board/Concept] → Searcher → Curator → VRH → Synthesizer → Brand Merge → MOOD_SPEC
+```
+
+### Skill Moodboard
+
+- **[hermesfy-moodboard](hermesfy-moodboard.md)** — Pipeline completo: buscar → curar → analizar → sintetizar → fusionar con marca
+
+### Módulo `moodboard/`
+
+El código está en `src/hermesfy/moodboard/`:
+- `searcher.py` — Pinterest scraper (Playwright) + queries multidimensionales + scoring por alt text
+- `curator.py` — Descarga, hash perceptual, filtro de diversidad
+- `synthesizer.py` — N StructuredSpecs → 1 MOOD_SPEC (paleta, mood, luz, composición)
+- `brand_merge.py` — Fusión MOOD_SPEC + DESIGN.md (marca gana colores y tipografía)
+- `orchestrator.py` — Pipeline unificado search → curate → analyze → synthesize → merge
+- `database.py` — SQLite persistence con IDs `mb_a1b2c3d4`
+- `tool.py` — Handler para `hermesfy_moodboard` (7 acciones)
+
+### Persistencia
+
+- **SQLite:** `~/.hermesfy/moodboard/moodboards.db`
+- **IDs:** `mb_a1b2c3d4` — únicos, referenciables, reusables
+- **Brands:** `~/.hermesfy/brands/<nombre>/design.yaml`
+
+### Comandos rápidos
+
+```
+hermesfy_moodboard action=run concept="hotel lujo selva" brand=provincial-plaza format=social_media
+hermesfy_moodboard action=board source_url="https://pin.it/xxx" concept="referencias"
+hermesfy_moodboard action=list
+hermesfy_moodboard action=use moodboard_id=mb_a1b2 new_concept="auto deportivo"
+```
 
 ## Node Types
 

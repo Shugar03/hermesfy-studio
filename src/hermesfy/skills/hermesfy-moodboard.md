@@ -1,6 +1,7 @@
 ---
 name: hermesfy-moodboard
 description: "Moodboard Engine: busca referencias visuales (Pinterest/boards), las analiza con VRH, sintetiza un MOOD_SPEC unificado y lo fusiona con el manual de marca. Pipeline completo con persistencia SQLite + IDs reusables."
+tags: [moodboard, pinterest, vrh, brand, design-system, sqLite]
 ---
 
 # Hermesfy Moodboard Engine
@@ -63,6 +64,42 @@ hermesfy_moodboard action=stats
 5. BRAND MERGER: MOOD_SPEC + ~/.hermesfy/brands/<name>/design.md
 ```
 
+## Estrategia de búsqueda
+
+NO buscar términos genéricos. Usar queries multidimensionales:
+- **Dominio**: hotel, perfume, auto (lo que pide el usuario)
+- **Formato**: advertising, editorial, social media, product (cómo se ve)
+- **Estilo**: luxury, minimalist, vintage, gothic (la estética)
+- **Referencia**: moodboard, campaign, lookbook (intención de búsqueda)
+
+Ejemplo: no "perfume" sino "perfume advertising campaign luxury editorial".
+
+## Scoring por alt text (validado en pilot)
+
+El alt text de Pinterest contiene descripciones reales. Se puntúa:
+- +5 por palabras de formato (advertising, campaign, commercial)
+- +3 por palabras del concepto (hotel, luxury, resort)
+- +3 por palabras de estilo (luxury, minimalist, elegant)
+- -5 si la descripción es genérica (< 15 chars)
+- -10 si contiene palabras negativas (food, recipe, diy, tutorial, cat, wedding)
+
+## Filtro de diversidad (lección del pilot)
+
+SIN diversity filter: 9/12 imágenes del mismo pinner ("@lepetit_hotel_").
+SOLUCIÓN: agrupar por primeros 30 chars del alt text, máximo 3 por grupo.
+
+## Brand merge
+
+La marca SIEMPRE gana en:
+- **Colores** → reemplazan la paleta del mood
+- **Tipografía** → reemplaza cualquier font de la referencia
+- **Tono** → se inyecta en el spec
+
+La referencia mantiene:
+- **Composición** → layout, regla visual
+- **Iluminación** → dirección, tipo de luz
+- **Mood** → atmósfera (si compatible con marca)
+
 ## Persistencia
 
 - **SQLite:** `~/.hermesfy/moodboard/moodboards.db`
@@ -91,6 +128,14 @@ formats:
   story: "9:16"
 ```
 
+## Pitfalls
+
+- **Diversity**: sin filtrar, un solo pinner puede dominar el moodboard
+- **Alt text**: a veces el alt text no describe la imagen (falla el scoring). El VRH lo compensa.
+- **Board privado**: si el board es secreto, Pinterest redirige al login. Hacerlo público o subir imágenes directo.
+- **VRH no disponible**: sin Vision LLM, el synthesizer usa defaults. El MoodSpec sigue siendo válido pero menos rico.
+- **originals/ 403**: Pinterest bloquea `i.pinimg.com/originals/`. Siempre usar `736x/`.
+
 ## Archivos del módulo
 
 | Archivo | Propósito |
@@ -102,4 +147,4 @@ formats:
 | `moodboard/orchestrator.py` | Pipeline completo |
 | `moodboard/database.py` | SQLite persistence |
 | `moodboard/tool.py` | Tool handler |
-| `moodboard/templates/search_templates.py` | Query templates por formato |
+| `moodboard/templates/search_templates.py` | 7 categorías de queries |
