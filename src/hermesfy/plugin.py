@@ -13,8 +13,9 @@ def _on_session_start(**kwargs) -> None:
     """Notify that Hermesfy Studio tools are ready."""
     logger.info(
         "[hermesfy] Hermesfy Studio active — DAG workflow engine for image generation via Fal.ai. "
-        "7 tools available: define_workflow, execute_workflow, workflow_status, "
-        "edit_node, list_models, save_workflow, load_workflow. "
+        "11 tools available: define_workflow, execute_workflow, workflow_status, "
+        "edit_node, list_models, save_workflow, load_workflow, run_agentic_workflow, "
+        "list_templates, history, reference_analyze. "
         "Use skill 'hermesfy-guide' for full documentation."
     )
 
@@ -56,6 +57,7 @@ def register(ctx) -> None:
     from hermesfy.tools.run_agentic_workflow import run_agentic_workflow
     from hermesfy.tools.list_templates import list_templates_tool
     from hermesfy.tools.history import history_tool
+    from hermesfy.tools.reference_analyze import reference_analyze, REFERENCE_ANALYZE_SCHEMA
 
     TOOLSET = "hermesfy"
 
@@ -188,9 +190,16 @@ def register(ctx) -> None:
         },
         handler=history_tool,
     )
+    ctx.register_tool(
+        name="hermesfy_reference_analyze",
+        toolset=TOOLSET,
+        description="VRH: Analyze a reference image and extract structured visual spec (layout, palette, typography, lighting, composition) for ad generation. Returns JSON ready for SpecBridge.",
+        schema=REFERENCE_ANALYZE_SCHEMA,
+        handler=reference_analyze,
+    )
 
     logger.info(
-        "[hermesfy] Registered 10 tools in toolset '%s', 1 skill (hermesfy-guide), "
+        "[hermesfy] Registered 11 tools in toolset '%s', 1 skill (hermesfy-guide), "
         "1 hook (on_session_start). %d Fal.ai models available.",
         TOOLSET,
         len(get_models()),
