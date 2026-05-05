@@ -45,6 +45,8 @@ que preservan el estilo, layout, paleta, iluminación y composición exactos.
 
 ### Skills VRH
 
+- **[hermesfy-vrh-workflow](hermesfy-vrh-workflow.md)** — Orquestación completa del pipeline (análisis → generación → entrega)
+- **[visual-reference-analyzer](visual-reference-analyzer.md)** — Analizar imagen y extraer StructuredSpec (Fase 1)
 - **[hermesfy-spec-bridge](hermesfy-spec-bridge.md)** — Traduce StructuredSpec a ExecutionSpec (prompt estructurado + parámetros de generación)
 - **[hermesfy-goldilocks-rule](hermesfy-goldilocks-rule.md)** — Fidelity dinámico según keywords del usuario ("exactamente igual" → 0.95, "ignorá" → 0.25)
 - **[hermesfy-vrh-preview](hermesfy-vrh-preview.md)** — Preview del spec antes de generar para validación del usuario
