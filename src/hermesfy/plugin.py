@@ -13,9 +13,9 @@ def _on_session_start(**kwargs) -> None:
     """Notify that Hermesfy Studio tools are ready."""
     logger.info(
         "[hermesfy] Hermesfy Studio active — DAG workflow engine for image generation via Fal.ai. "
-        "11 tools available: define_workflow, execute_workflow, workflow_status, "
+        "12 tools available: define_workflow, execute_workflow, workflow_status, "
         "edit_node, list_models, save_workflow, load_workflow, run_agentic_workflow, "
-        "list_templates, history, reference_analyze. "
+        "list_templates, history, reference_analyze, moodboard. "
         "Use skill 'hermesfy-guide' for full documentation."
     )
 
@@ -58,6 +58,7 @@ def register(ctx) -> None:
     from hermesfy.tools.list_templates import list_templates_tool
     from hermesfy.tools.history import history_tool
     from hermesfy.tools.reference_analyze import reference_analyze, REFERENCE_ANALYZE_SCHEMA
+    from hermesfy.moodboard.tool import moodboard_handler, MOODBOARD_SCHEMA
 
     TOOLSET = "hermesfy"
 
@@ -197,9 +198,16 @@ def register(ctx) -> None:
         schema=REFERENCE_ANALYZE_SCHEMA,
         handler=reference_analyze,
     )
+    ctx.register_tool(
+        name="hermesfy_moodboard",
+        toolset=TOOLSET,
+        description="Moodboard: build curated visual moodboards from Pinterest/boards/uploads. Run pipeline: search→curate→VRH→synthesize→brand merge. Create, list, get, reuse moodboards with 'mb_xxx' IDs. Powered by ~/.hermesfy/brands/<name>/design.md for brand identity.",
+        schema=MOODBOARD_SCHEMA,
+        handler=moodboard_handler,
+    )
 
     logger.info(
-        "[hermesfy] Registered 11 tools in toolset '%s', 1 skill (hermesfy-guide), "
+        "[hermesfy] Registered 12 tools in toolset '%s', 1 skill (hermesfy-guide), "
         "1 hook (on_session_start). %d Fal.ai models available.",
         TOOLSET,
         len(get_models()),
