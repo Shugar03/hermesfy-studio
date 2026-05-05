@@ -38,8 +38,45 @@ Retorna `tuple[float, float, str]`: (fidelity_ratio, semantic_drift, label)
 
 **Minimal → High → Medium → Low**
 
-"ignorá la referencia" → contiene "referencia" (Medium), pero Minimal
-matchea primero con "ignorá" → 0.25.
+### Pitfall: keywords compartidos entre grupos
+
+"referencia" aparece en Medium ("estilo de", "referencia"), pero también
+está en frases Minimal ("sin referencia", "ignorá la referencia").
+Si Minimal va último (High → Medium → Low → Minimal), "ignorá la referencia"
+matchea "referencia" (Medium → 0.85) ANTES que "ignorá" (Minimal → 0.25).
+
+Este bug se descubrió testeando. La implementación inicial tenía Minimal
+al final y fallaba silenciosamente — el código se ejecutaba sin error pero
+daba fidelity incorrecto.
+
+**Solución:** checkear Minimal primero (señal de override más fuerte),
+High segundo, Medium tercero, Low cuarto. Además agregar frases combinadas
+como "ignorá la foto" para agarrar edge cases donde Minimal y Medium
+comparten tokens.
+
+### Test methodology
+
+Para verificar matching correcto, testear TODOS los grupos + edge cases:
+
+```python
+tests = {
+    'exactamente igual pero Vichy':       (0.95, 0.05),  # High
+    'mismo estilo pero X':                (0.95, 0.05),  # High
+    'parecido a esto':                    (0.85, 0.15),  # Medium
+    'inspirado en esta foto':             (0.60, 0.40),  # Low
+    'ignorá la referencia':               (0.25, 0.75),  # Minimal (edge!)
+    'hacé lo que quieras':                (0.25, 0.75),  # Minimal
+    '':                                   (0.85, 0.15),  # Default
+    'producto de skincare':               (0.85, 0.15),  # Default
+}
+
+for prompt, (exp_f, exp_d) in tests.items():
+    f, d, _ = bridge._determine_fidelity(prompt)
+    assert (f, d) == (exp_f, exp_d), f'FAIL: "{prompt}" → ({f},{d})'
+```
+
+El test con "ignorá la referencia" es el detector del bug. Siempre
+testear edge cases donde keywords coexisten entre grupos.
 
 ## Efectos secundarios en build()
 
