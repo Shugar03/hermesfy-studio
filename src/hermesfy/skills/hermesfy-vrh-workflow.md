@@ -1,95 +1,289 @@
 ---
 name: hermesfy-vrh-workflow
 description: >-
-  Orquestar el pipeline completo VRH (Visual Reference Harness) de Hermesfy.
-  Telegram → VisualAnalysis → SpecBridge → DAG → Delivery.
-  1 solo workflow que cubre análisis, generación y entrega.
+  MOTHER SKILL — Orquesta COMPLETO el pipeline VRH de Hermesfy Studio.
+  Gatekeeper MANDATORIO para TODA generación con imágenes de referencia.
+  Incluye: Goldilocks Rule, SpecBridge, Preview, DAG multi-modelo, Delivery.
+  Telegram → VisualAnalysis → Goldilocks → Preview → DAG → Delivery.
 ---
 
-# Hermesfy VRH Workflow
+# ⛔ HERMESFY VRH WORKFLOW — GATEKEEPER MANDATORIO ⛔
 
-## Cuándo usarlo
+**ESTA SKILL ES EL PUNTO DE ENTRADA ÚNICO para toda generación de imágenes
+con referencias visuales en Hermesfy Studio.**
 
-El usuario envía una imagen de referencia por Telegram y pide generar
-algo nuevo basado en ella. Este skill orquesta TODO el pipeline:
-análisis visual → spec → DAG → entrega.
+Si hay imágenes del usuario involucradas, esta skill DEBE ejecutarse.
+No hay atajos. No hay bypass. No hay "voy directo a genmedia".
 
-## Pipeline completo
+---
+
+## 🚨 GATEKEEPER — FASE 0 (ANTES que nada)
+
+### Cuando esta skill DEBE activarse
+
+Cualquiera de estos triggers la vuelve MANDATORIA:
+
+| Trigger | Ejemplo |
+|---------|---------|
+| Usuario manda 1+ imágenes | `[image]` en Telegram |
+| Pide "cambiar X por Y" sobre una referencia | "cambiale la botella por Vichy" |
+| Pide "igual pero con..." | "exactamente igual pero con Quencher" |
+| Pide "usá esta imagen de referencia" | "basate en esta foto" |
+| Menciona "reemplazar", "mantener layout", "mismo estilo" | "mismo estilo pero otro producto" |
+| Pide generar algo "como esta imagen" | "como la del escritorio pero con..." |
+
+### ⛔ PROHIBIDO — NUNCA hacer esto cuando hay referencias
 
 ```
-┌──────────┐    ┌──────────────┐    ┌──────────┐    ┌────────┐    ┌──────────┐
-│ Telegram │───→│ VisualAnalyzer│───→│ SpecBridge│───→│ DAG    │───→│ Delivery │
-│ (image)  │    │ Phase 1      │    │ Phase 2   │    │ Phase 3│    │ Phase 4  │
-└──────────┘    └──────────────┘    └──────────┘    └────────┘    └──────────┘
-                                                      │
-                                                 ┌────┴────┐
-                                                 │ Fal.ai  │
-                                                 └─────────┘
+❌ Llamar image_generate directamente
+❌ Llamar terminal(genmedia run ...) sin pasar por el pipeline
+❌ Escribir prompts a mano sin StructuredSpec previo
+❌ Generar sin preguntar al usuario (sin Preview Fase 2)
+❌ Usar UN solo modelo cuando el task requiere DAG multi-step
 ```
 
-## Workflow paso a paso
+### ✅ OBLIGATORIO — Siempre seguir este orden
 
-### FASE 1: Visual Analysis
+```
+FASE 0 → Gatekeeper: ¿hay imágenes? → ACTIVAR ESTA SKILL
+FASE 1 → VisualAnalyzer: extraer StructuredSpec de CADA imagen
+FASE 2 → Goldilocks + Preview: determinar fidelity, MOSTRAR preview, PREGUNTAR
+FASE 3 → DAG Execution: multi-modelo con seed propagation
+FASE 4 → Delivery: descargar, verificar, entregar
+```
+
+---
+
+## FASE 1: Visual Analysis
+
+### 1.1 Detectar imágenes
+
+Las imágenes llegan a `~/.hermes/cache/images/`. Buscar las más recientes:
+
+```bash
+ls -lt ~/.hermes/cache/images/ | head -5
+```
+
+### 1.2 Analizar CADA imagen con StructuredSpec
 
 ```python
-# Detectar la imagen (ya está en cache desde Telegram)
-image_path = "/home/hermes/.hermes/cache/images/img_xxx.jpg"
-
+import sys
+sys.path.insert(0, '/opt/hermesfy-studio/src')
 from hermesfy.reference.visual_analyzer import VisualAnalyzer
+
 analyzer = VisualAnalyzer()
-vision_prompt = analyzer.get_vision_prompt(user_hint)
 
-# Llamar vision_analyze tool o mcp_minimax_understand_image
-vision_response = vision_analyze(image_path=image_path, question=vision_prompt)
-
-# Parsear a StructuredSpec
-spec = VisualAnalyzer.parse_vision_text(vision_response)
+# Para cada imagen de referencia:
+for image_path in reference_images:
+    # Usar vision_analyze con el prompt estructurado
+    vision_prompt = analyzer.get_vision_prompt(user_hint="lo que el usuario quiere")
+    # → llamar a mcp_minimax_understand_image o vision_analyze
+    # Parsear resultado:
+    spec = VisualAnalyzer.parse_vision_text(vision_response)
 ```
 
-### FASE 2: Goldilocks + Preview
+**StructuredSpec extrae:**
+- Layout (zonas, posiciones, % de pantalla)
+- Paleta de colores exacta (hex aproximados)
+- Iluminación (dirección, tipo, intensidad)
+- Objetos (qué, dónde, tamaño relativo)
+- Tipografía (posición, estilo, tamaño)
+- Profundidad de campo (qué está en foco vs blur)
+
+### 1.3 Múltiples referencias
+
+Cuando el usuario manda 2+ imágenes (ej: una del layout, otra del producto):
+- **Imagen A** → spec de composición/estilo (el "dónde")
+- **Imagen B** → spec del sujeto/producto (el "qué")
+- El SpecBridge fusiona ambas specs
+
+---
+
+## FASE 2: Goldilocks Rule — Fidelity Matching
+
+### 2.1 Detección automática de fidelity
 
 ```python
 from hermesfy.reference.spec_bridge import SpecBridge
 bridge = SpecBridge()
+fidelity, drift, label = bridge._determine_fidelity(user_prompt)
+```
 
-# Mostrar preview al usuario
+| Grupo | Keywords | fidelity | drift |
+|-------|----------|----------|-------|
+| **Minimal** | "ignorá", "sin referencia", "creativo libre", "de cero", "inventá" | 0.25 | 0.75 |
+| **High** | "exactamente igual", "idéntico", "mismo", "sin cambiar", "solo cambia", "mantené todo", "copiá", "calcá", "reproducí", "100% fidelidad" | 0.95 | 0.05 |
+| **Medium** | "parecido", "similar", "mismo estilo", "referencia", "como esta foto" | 0.85 | 0.15 |
+| **Low** | "inspirado", "algo así", "onda", "vibra", "tirando a" | 0.60 | 0.40 |
+| **Default** | Sin keywords claras | 0.85 | 0.15 |
+
+**Orden de matching:** Minimal primero → High → Medium → Low
+(Minimal va primero porque "ignorá la referencia" matchea "referencia" en Medium si no)
+
+### 2.2 Preview — OBLIGATORIO preguntar al usuario
+
+```python
+# Build preview
 preview = bridge.build(spec, user_prompt, preview=True)
-# "¿Genero así o ajustamos algo?"
 
-# Si el usuario dice "dale":
-exec_spec = bridge.build(spec, user_prompt, reference_mode="style_layout", quality="high")
+# MOSTRAR al usuario:
+# 📐 Layout: ...
+# 🎨 Paleta: ...
+# 💡 Iluminación: ...
+# 🎯 Fidelidad: Alta (95%)
+# 🖼️ Referencias: [lista de imágenes]
+# 
+# ¿Genero así o ajustamos algo?
 ```
 
-### FASE 3: DAG Execution
+**NUNCA generar sin antes mostrar el preview y recibir confirmación.**
+
+Si el usuario dice "dale", "ok", "generá", "vamos" → continuar a Fase 3.
+
+### 2.3 Build ExecutionSpec
 
 ```python
-prompt = exec_spec["dag_workflow"]["steps"][0]["params"]["prompt"]
-negative = exec_spec["dag_workflow"]["steps"][0]["params"]["negative_prompt"]
-seed = exec_spec["dag_workflow"]["steps"][0]["params"]["seed"]
-# Llamar a hermesfy_run_agentic_workflow o construir DAG manual
+exec_spec = bridge.build(
+    spec,
+    user_prompt,
+    reference_mode="style_layout",  # default
+    quality="high"
+)
 ```
 
-### FASE 4: Delivery
-
-```python
-from hermesfy.reference.delivery import Delivery
-delivery = Delivery()
-image_url = extract_url_from_fal_response(fal_output)
-local_path = delivery.download(image_url)
-# Incluir MEDIA:path en la respuesta
-```
-
-## Modos de referencia
-
+**Modos de referencia:**
 | mode | uso |
 |------|-----|
-| `style_layout` | Default. Mantener estilo visual + composición |
+| `style_layout` | Default. Mantener TODO: estilo visual + composición |
 | `style_only` | Cambiar composición, mantener paleta/iluminación |
 | `layout_only` | Cambiar estilo, mantener layout |
 | `subject_only` | Solo mantener el sujeto, todo lo demás nuevo |
 
-## Errores comunes
+---
 
-- Fal.ai URL expira → delivery.py descarga inmediatamente
-- Vision alucina spec → preview + confirmación del usuario
-- El generador ignora la paleta → subir fidelity_ratio a 0.95
+## FASE 3: DAG Multi-Model Execution
+
+### 3.1 Estrategia de modelos por tipo de task
+
+No usar un solo modelo. Usar el DAG:
+
+| Task type | Nodo 1 (base) | Nodo 2 (refinar) | Nodo 3 (pulir) |
+|-----------|---------------|------------------|-----------------|
+| Alta fidelidad (0.95) | `fal-ai/flux/schnell` | `openai/gpt-image-2` | `fal-ai/nano-banana-pro` |
+| Texto preciso | `fal-ai/flux/schnell` | `fal-ai/nano-banana-pro/edit` | — |
+| Estilo artístico | `fal-ai/flux/dev` | `fal-ai/nano-banana-2` | — |
+| Rápido/borrador | `fal-ai/flux/schnell` | — | — |
+
+### 3.2 Ejecutar vía GenmediaProvider
+
+```python
+import asyncio
+from hermesfy.providers.genmedia import GenmediaProvider
+
+async def run_dag(exec_spec):
+    p = GenmediaProvider()
+    
+    # Nodo 1: base rápida
+    r1 = await p.generate('image_gen', {
+        'prompt': exec_spec['dag_workflow']['steps'][0]['params']['prompt'],
+        'width': exec_spec['dag_workflow']['steps'][0]['params'].get('width', 1024),
+        'height': exec_spec['dag_workflow']['steps'][0]['params'].get('height', 1024),
+        'guidance_scale': 3.5,
+        'model': 'fal-ai/flux/schnell',
+    })
+    
+    # Nodo 2: refinar con modelo superior (si fidelity > 0.85)
+    if fidelity > 0.85:
+        r2 = await p.generate('image_gen', {
+            'prompt': prompt_refinado,
+            'model': 'openai/gpt-image-2',
+            # heredar dimensiones del nodo 1
+            'width': r1.width, 'height': r1.height,
+        })
+        return r2
+    return r1
+```
+
+### 3.3 Seed propagation
+
+Mantener la seed entre nodos para consistencia visual:
+
+```python
+seed = result.metadata.get('seed', random.randint(0, 2**32))
+# Pasar la misma seed al siguiente nodo
+config['seed'] = seed
+```
+
+---
+
+## FASE 4: Delivery + Verificación
+
+### 4.1 Descargar imagen
+
+```python
+from hermesfy.reference.delivery import Delivery
+delivery = Delivery()
+local_path = delivery.download(image_url)
+```
+
+### 4.2 Verificar contra el spec
+
+```python
+# Verificar dimensiones, formato
+# Si hay problemas → flaggear para iteración
+```
+
+### 4.3 Entregar
+
+Responder con `MEDIA:/path/to/file.jpg` + resumen de lo generado.
+
+---
+
+## Manejo de múltiples referencias (COMPOSITING)
+
+Cuando el usuario manda 2+ imágenes de referencia con intenciones distintas:
+
+1. **Analizar cada imagen por separado** (Fase 1 para cada una)
+2. **Clasificar roles:**
+   - Imagen A → "layout_reference" (la escena, composición)
+   - Imagen B → "subject_reference" (el producto a insertar)
+3. **SpecBridge fusiona:** toma layout de A + sujeto de B
+4. **Prompt resultante:** `[SUBJECT de Spec B] [ENVIRONMENT de Spec A] [STYLE de Spec A]`
+5. **Si fidelity=0.95 y hay subject_reference:** usar img2img o GPT Image 2 con la imagen del sujeto como input visual para preservar su diseño exacto
+
+---
+
+## Errores comunes — CÓMO EVITARLOS
+
+| Error | Causa | Prevención |
+|-------|-------|------------|
+| Producto no se parece a la referencia | Usar solo texto, sin input visual | Si fidelity > 0.90 → usar img2img o GPT Image 2 con la foto del producto |
+| Layout no respeta el original | FLUX inventa composición | fidelity 0.95 incluye `[FIDELITY HIGH — preservar composición exacta]` en el prompt |
+| Tipografía ilegible o incorrecta | FLUX texto pobre | Usar Nano Banana Pro para texto, o GPT Image 2 |
+| Colores wrong | No se pasó la paleta al prompt | StructuredSpec incluye colores exactos → van al prompt |
+| Generar sin preguntar | Saltarse Fase 2 | **NUNCA saltar Preview.** Siempre preguntar. |
+| Un solo modelo para todo | No usar DAG | DAG multi-step para tasks complejos |
+
+---
+
+## Checklist de auto-verificación
+
+Antes de responder al usuario, verificar:
+
+- [ ] ¿Cargué esta skill? (hermesfy-vrh-workflow)
+- [ ] ¿Analicé TODAS las imágenes de referencia? (Fase 1)
+- [ ] ¿Ejecuté Goldilocks y detecté fidelity correcto? (Fase 2)
+- [ ] ¿Mostré preview al usuario y esperé confirmación? (Fase 2)
+- [ ] ¿Usé DAG multi-modelo (no un solo modelo)? (Fase 3)
+- [ ] ¿Usé GenmediaProvider, no genmedia CLI directo? (Fase 3)
+- [ ] ¿Descargué la imagen y la entregué como MEDIA:? (Fase 4)
+- [ ] ¿Verifiqué el output contra el spec? (Fase 4)
+
+---
+
+## Sub-skills relacionadas (cargadas automáticamente por esta skill madre)
+
+- `hermesfy-goldilocks-rule` → Fidelity matching automático
+- `hermesfy-spec-bridge` → Conversión StructuredSpec → ExecutionSpec
+- `hermesfy-vrh-preview` → Preview visual antes de generar
+- `visual-reference-analyzer` → Análisis de imagen de referencia
