@@ -253,16 +253,44 @@ Cuando el usuario manda 2+ imágenes de referencia con intenciones distintas:
 
 ---
 
+## ⚠️ LIMITACIÓN CRÍTICA: Fidelidad de producto en text-to-image
+
+**Descubrimiento empírico (sesión 2026-05-07):** Los modelos text-to-image, incluso GPT Image 2 con `--image_urls`, **no preservan el diseño exacto de productos con marca**. El modelo interpreta la referencia como "inspiración" y crea un producto similar pero distinto.
+
+| Test | Referencia | Resultado |
+|------|-----------|-----------|
+| Quencher GOODAL tumbler | Matte black, banda dorada, mango C, straw | Tumbler genérico sin marca |
+| Perfume "9 pm REBEL" | Cuboid oscuro, líquido azul, etiqueta específica | "Maison des Parfums Bella" (inventado) |
+
+**Causa raíz:** Los modelos de difusión no tienen "memoria visual" de productos específicos. El parámetro `--image_urls` en GPT Image 2 se usa como guía compositiva, no como calco de diseño.
+
+### Estrategias que SÍ funcionan (por orden de efectividad)
+
+| Estrategia | Fidelidad | Cuándo usarla |
+|-----------|-----------|---------------|
+| **Img2img con producto como BASE** | Alta | Usar `fal-ai/flux/dev/image-to-image` con la foto del producto como `--image_url` y strength 0.3–0.5. El modelo PARTE de la foto real y agrega el entorno. |
+| **Inpainting sobre layout** | Máxima | Usar `fal-ai/flux/inpainting` con la foto del layout como base + máscara donde va el producto + la foto del producto como referencia. Requiere crear una máscara. |
+| **GPT Image 2 edit con máscara** | Máxima | `openai/gpt-image-2/edit` + `--mask_url` sobre la imagen del layout, con prompt indicando qué producto insertar. |
+| **Post-procesado manual** | 100% | Generar layout sin producto, generar producto por separado, compositar en Photoshop/GIMP. Fuera del alcance de Hermesfy. |
+
+### Cómo manejar esto con el usuario
+
+Cuando el task requiera **100% fidelidad de producto con marca específica:**
+1. Advertir en FASE 2 (Preview): "El diseño exacto del producto puede no preservarse al 100% con text-to-image."
+2. Ofrecer alternativas: img2img con la foto del producto como base, o inpainting.
+3. Si el usuario confirma "generá igual", proceder aceptando el riesgo.
+
 ## Errores comunes — CÓMO EVITARLOS
 
 | Error | Causa | Prevención |
 |-------|-------|------------|
-| Producto no se parece a la referencia | Usar solo texto, sin input visual | Si fidelity > 0.90 → usar img2img o GPT Image 2 con la foto del producto |
+| Producto no se parece a la referencia | Text-to-image no preserva marcas | **NO usar texto para describir el producto.** Usar img2img con la foto como `--image_url` (strength 0.3–0.5) o inpainting con máscara. |
 | Layout no respeta el original | FLUX inventa composición | fidelity 0.95 incluye `[FIDELITY HIGH — preservar composición exacta]` en el prompt |
 | Tipografía ilegible o incorrecta | FLUX texto pobre | Usar Nano Banana Pro para texto, o GPT Image 2 |
 | Colores wrong | No se pasó la paleta al prompt | StructuredSpec incluye colores exactos → van al prompt |
 | Generar sin preguntar | Saltarse Fase 2 | **NUNCA saltar Preview.** Siempre preguntar. |
 | Un solo modelo para todo | No usar DAG | DAG multi-step para tasks complejos |
+| GPT Image 2 `--image_urls` no preserva diseño | El parámetro es guía, no calco | Usar img2img real (strength < 0.5) o inpainting. Ver sección LIMITACIÓN CRÍTICA arriba. |
 
 ---
 
