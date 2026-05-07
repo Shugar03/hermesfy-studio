@@ -7,9 +7,15 @@ from hermesfy.dag.executor import execute
 from hermesfy.rendering.canvas import render_minimal_canvas
 from hermesfy.tools.workflows import get_workflow, set_workflow_states
 
-# Try to use FalProvider, but fall back gracefully if not possible
+# Try to use GenmediaProvider, but fall back gracefully if not possible
 try:
-    from hermesfy.providers.fal import FalProvider, PROVIDER_AUTH, PROVIDER_ERROR
+    from hermesfy.providers.genmedia import GenmediaProvider, PROVIDER_AUTH, PROVIDER_ERROR
+except ImportError:
+    GenmediaProvider = None
+
+# Legacy FalProvider fallback (will be removed after migration)
+try:
+    from hermesfy.providers.fal import FalProvider
 except ImportError:
     FalProvider = None
 
@@ -28,14 +34,31 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
     if workflow is None:
         return json.dumps({"error": {"code": "NODE_NOT_FOUND", "message": f"Workflow '{workflow_id}' not found"}})
 
-    # Use FalProvider if FAL_API_KEY is set, otherwise use a mock
-    try:
-        provider = FalProvider()
-    except RuntimeError:
-        # No FAL_API_KEY — use mock provider for dry-run
+    # Use GenmediaProvider if genmedia CLI is installed, fall back to FalProvider, then mock
+    provider = None
+    provider_error = None
+
+    if GenmediaProvider:
+        try:
+            provider = GenmediaProvider()
+        except RuntimeError as e:
+            provider_error = str(e)
+
+    if provider is None and FalProvider:
+        try:
+            provider = FalProvider()
+        except RuntimeError as e:
+            if provider_error:
+                provider_error += " | " + str(e)
+            else:
+                provider_error = str(e)
+
+    if provider is None:
+        # No provider available — use mock for dry-run
         class MockProvider:
             async def generate(self, node_type: str, config: dict) -> dict:
-                return {"mock": True, "node_type": node_type, "image_url": "https://example.com/mock.png"}
+                return {"mock": True, "node_type": node_type,
+                        "image_url": "https://example.com/mock.png"}
         provider = MockProvider()
 
     # Run the executor in a dedicated thread with its own event loop.

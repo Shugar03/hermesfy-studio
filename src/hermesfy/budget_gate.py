@@ -17,7 +17,10 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import subprocess
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -38,6 +41,37 @@ MODEL_COSTS: dict[str, float] = {
 }
 
 DEFAULT_MAX_BUDGET = 0.07  # USD
+
+# Dynamic pricing cache (populated by genmedia pricing)
+_pricing_cache: dict[str, float] = {}
+
+
+def _get_dynamic_cost(model: str) -> Optional[float]:
+    """Query genmedia pricing for a model. Returns cost in USD or None."""
+    if model in _pricing_cache:
+        return _pricing_cache[model]
+
+    if not os.environ.get("FAL_KEY") and not os.environ.get("FAL_API_KEY"):
+        return None
+
+    try:
+        result = subprocess.run(
+            ["genmedia", "pricing", model],
+            capture_output=True, text=True, timeout=10,
+            env={**os.environ, "GENMEDIA_NO_UPDATE": "1"},
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout)
+            # Try various pricing fields
+            cost = data.get("cost") or data.get("price") or data.get("cost_per_image")
+            if cost is not None:
+                cost = float(cost)
+                _pricing_cache[model] = cost
+                return cost
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError, FileNotFoundError, OSError):
+        pass
+
+    return None
 
 
 # ── Exceptions ───────────────────────────────────────────────────────────────
@@ -79,7 +113,10 @@ class BudgetGate:
         return self._spent + amount <= self.max_budget
 
     def estimate_cost(self, model: str) -> float:
-        """Get estimated cost for a model."""
+        """Get estimated cost for a model (tries dynamic genmedia pricing first)."""
+        dynamic = _get_dynamic_cost(model)
+        if dynamic is not None:
+            return dynamic
         return MODEL_COSTS.get(model, 0.025)
 
     def can_afford_model(self, model: str) -> bool:

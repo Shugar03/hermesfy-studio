@@ -77,7 +77,22 @@ else
     echo -e "${YELLOW}  ⚠ No FAL API key — set it in .env${NC}"
 fi
 
-# ── 6. Run Model Watcher (fetch fresh models from FAL.ai) ────
+# ── 5b. Install genmedia CLI (FAL's official agent tool) ─────
+echo -e "${YELLOW}[5.5/8] Installing genmedia CLI...${NC}"
+if command -v genmedia &>/dev/null; then
+    echo -e "${GREEN}  ✓ genmedia already installed ($(genmedia --version 2>&1 | head -1))${NC}"
+elif [ -f ~/.local/bin/genmedia ]; then
+    export PATH="$HOME/.local/bin:$PATH"
+    echo -e "${GREEN}  ✓ genmedia found at ~/.local/bin${NC}"
+else
+    echo -e "${YELLOW}  Installing genmedia (FAL's official CLI)...${NC}"
+    if curl https://genmedia.sh/install -fsS | bash 2>/dev/null; then
+        export PATH="$HOME/.local/bin:$PATH"
+        echo -e "${GREEN}  ✓ genmedia installed${NC}"
+    else
+        echo -e "${YELLOW}  ⚠ genmedia install failed — manual install: curl https://genmedia.sh/install -fsS | bash${NC}"
+    fi
+fi
 echo -e "${YELLOW}[6/7] Fetching latest models from FAL.ai...${NC}"
 # Model watcher lives in the local engine/ dir or can be run via the installed package
 if python3 -c "from hermesfy.providers.registry import ModelRegistry; print('ok')" 2>/dev/null; then
