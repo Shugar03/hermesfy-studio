@@ -163,16 +163,27 @@ exec_spec = bridge.build(
 
 ## FASE 3: DAG Multi-Model Execution
 
-### 3.1 Estrategia de modelos por tipo de task
+### 3.1 ⚠️ DISTINCIÓN CRÍTICA: Modelos GENERATIVOS vs Modelos EDIT
 
-No usar un solo modelo. Usar el DAG:
+**Descubrimiento empírico (sesión 2026-05-07):** FAL tiene DOS categorías de modelos, y usar la equivocada produce resultados basura.
 
-| Task type | Nodo 1 (base) | Nodo 2 (refinar) | Nodo 3 (pulir) |
-|-----------|---------------|------------------|-----------------|
-| Alta fidelidad (0.95) | `fal-ai/flux/schnell` | `openai/gpt-image-2` | `fal-ai/nano-banana-pro` |
-| Texto preciso | `fal-ai/flux/schnell` | `fal-ai/nano-banana-pro/edit` | — |
-| Estilo artístico | `fal-ai/flux/dev` | `fal-ai/nano-banana-2` | — |
-| Rápido/borrador | `fal-ai/flux/schnell` | — | — |
+| Categoría | Qué hacen | Ejemplos |
+|-----------|-----------|----------|
+| **GENERATIVOS** | Crean imágenes DESDE CERO. No preservan la imagen original. | `fal-ai/flux/schnell`, `fal-ai/flux/dev`, `openai/gpt-image-2`, `fal-ai/nano-banana-2` |
+| **EDIT** | Toman una imagen base y hacen cambios PUNTUALES. Preservan lo no modificado. | `fal-ai/gemini-3-pro-image-preview/edit`, `fal-ai/nano-banana-pro/edit`, `fal-ai/bytedance/seedream/v5/lite/edit`, `fal-ai/flux-2-pro/edit`, `openai/gpt-image-2/edit` |
+
+**Regla de oro:** Si el usuario pide "reemplazar X por Y manteniendo todo lo demás" → usar modelos EDIT, NUNCA generativos.
+
+### 3.2 Estrategia de modelos por tipo de task
+
+| Task type | ¿Qué modelos? | Estrategia |
+|-----------|--------------|------------|
+| **Creación desde cero** (sin referencias) | GENERATIVOS | `flux/schnell` → `gpt-image-2` → `nano-banana-pro` |
+| **Reemplazo de producto** (fidelity > 0.90) | EDIT | `gemini-3-pro-image-preview/edit` o `nano-banana-pro/edit` con `--image_urls` de layout + producto |
+| **Reemplazo con máscara** (fidelity máxima) | EDIT + máscara | `gpt-image-2/edit` o `flux/inpainting` con `--mask_url` |
+| **Texto preciso** | EDIT (tipografía) | `nano-banana-pro/edit` |
+| **Estilo artístico** | GENERATIVOS | `flux/dev` → `nano-banana-2` |
+| **Rápido/borrador** | GENERATIVO simple | `flux/schnell` solo |
 
 ### 3.2 Ejecutar vía GenmediaProvider
 
