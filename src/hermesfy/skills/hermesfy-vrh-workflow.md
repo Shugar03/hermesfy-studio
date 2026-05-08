@@ -17,6 +17,24 @@ No hay atajos. No hay bypass. No hay "voy directo a genmedia".
 
 ---
 
+## 🔴 ANTI-BYPASS — LEER ANTES DE CUALQUIER ACCIÓN
+
+Si estás a punto de llamar a `terminal(genmedia run ...)` o `image_generate` o `execute_code` con generación de imagen, y NO has completado TODOS estos pasos, **DETENETE**:
+
+```
+□ FASE 1: ¿Analicé CADA imagen con vision_analyze? 
+□ FASE 2: ¿Mostré el preview al usuario y esperé su confirmación?
+□ ModelSelection: ¿Consulté fal-model-taxonomy para elegir el modelo correcto?
+□ PromptFormat: ¿Usé el formato de prompting de la familia del modelo (Change/Preserve/Constraints, etc.)?
+□ FASE 3: ¿Planifiqué un DAG multi-step (no un solo modelo)?
+```
+
+**Si alguno de estos checkboxes está vacío → NO generes. Volvé a FASE 1.**
+
+Si alguna vez te encontrás pensando "esto es simple, voy directo a genmedia" → **eso es exactamente el bypass que esta skill existe para prevenir.**
+
+---
+
 ## 🚨 GATEKEEPER — FASE 0 (ANTES que nada)
 
 ### Cuando esta skill DEBE activarse
@@ -178,37 +196,51 @@ exec_spec = bridge.build(
 
 | Task type | ¿Qué modelos? | Estrategia |\n|-----------|--------------|------------|\n| **Creación desde cero** (sin referencias) | GENERATIVOS | `flux/schnell` → `gpt-image-2` → `nano-banana-pro` |\n| **Product compositing** (reemplazar producto, preservar escena) | EDIT | ⭐ **`seedream/v4.5/edit`** (PRIMARIO — diseñado para esto: hasta 10 refs, compositing espacial). Alternativa: `gemini-3-pro-image-preview/edit` (bueno pero reinterpreta). NUNCA usar generativos (FLUX/GPT-Image) para esto. |\n| **Edición con máscara** (fidelity máxima, área precisa) | EDIT + máscara | `gpt-image-2/edit` con `--mask_url`, o `flux/inpainting` |\n| **Texto preciso + tipografía** | EDIT (tipografía) | `nano-banana-pro/edit` (tags: realism, typography) |\n| **Estilo artístico / transferencia** | GENERATIVOS | `flux/dev` → `nano-banana-2` |\n| **Rápido/borrador** | GENERATIVO simple | `flux/schnell` solo |\n| **Iterativo (character consistency)** | EDIT iterativo | `flux-pro/kontext` (preserva identidad entre rondas) |
 
-### 3.2 Ejecutar vía GenmediaProvider
+### 3.3 Ejecutar vía GenmediaProvider + ModelQueryEngine
 
 ```python
 import asyncio
 from hermesfy.providers.genmedia import GenmediaProvider
+from hermesfy.model_query_engine import ModelQueryEngine, TaskSpec
 
-async def run_dag(exec_spec):
+async def run_dag(exec_spec, reference_count=0, fidelity=0.85):
     p = GenmediaProvider()
     
-    # Nodo 1: base rápida
+    # Seleccionar modelo con ModelQueryEngine (NO hardcodeado)
+    engine = ModelQueryEngine()
+    results = engine.query(TaskSpec(
+        action="edit" if reference_count > 0 else "generate",
+        reference_count=reference_count,
+        priority="quality" if fidelity > 0.85 else "cost",
+    ), top_n=1)
+    model_id = results[0].endpoint_id if results else "fal-ai/flux/schnell"
+    
+    # Nodo 1
     r1 = await p.generate('image_gen', {
         'prompt': exec_spec['dag_workflow']['steps'][0]['params']['prompt'],
+        'model': model_id,
         'width': exec_spec['dag_workflow']['steps'][0]['params'].get('width', 1024),
         'height': exec_spec['dag_workflow']['steps'][0]['params'].get('height', 1024),
-        'guidance_scale': 3.5,
-        'model': 'fal-ai/flux/schnell',
     })
     
-    # Nodo 2: refinar con modelo superior (si fidelity > 0.85)
+    # Nodo 2: refinar si high fidelity
     if fidelity > 0.85:
+        refine_results = engine.query(TaskSpec(
+            action="edit", reference_count=1, priority="quality"
+        ), top_n=1)
+        refine_model = refine_results[0].endpoint_id if refine_results else model_id
+        
         r2 = await p.generate('image_gen', {
-            'prompt': prompt_refinado,
-            'model': 'openai/gpt-image-2',
-            # heredar dimensiones del nodo 1
+            'prompt': refined_prompt,
+            'model': refine_model,
             'width': r1.width, 'height': r1.height,
+            'seed': r1.metadata.get('seed'),
         })
         return r2
     return r1
 ```
 
-### 3.3 Seed propagation
+### 3.4 Seed propagation
 
 Mantener la seed entre nodos para consistencia visual:
 
@@ -217,6 +249,55 @@ seed = result.metadata.get('seed', random.randint(0, 2**32))
 # Pasar la misma seed al siguiente nodo
 config['seed'] = seed
 ```
+
+### 3.5 Pipeline de edición quirúrgica (SAM 3 + mask)
+
+**Cuándo usarlo:** fidelity > 0.90, 2+ imágenes de referencia, necesidad de preservar TODO excepto el producto.
+
+```
+Paso 1: SAM 3 segmenta el área a reemplazar
+  genmedia run fal-ai/sam-3/image
+    --image_url <layout_image>
+    --prompt "el objeto exacto a reemplazar"
+  → obtiene mask_url (área blanca = lo que se edita)
+
+Paso 2: GPT Image 2 Edit con máscara
+  genmedia run openai/gpt-image-2/edit
+    --image_urls [layout, subject]
+    --mask_url <mask_de_sam3>
+    --prompt "<formato Change/Preserve/Constraints>"
+```
+
+**Formato OBLIGATORIO del prompt de edición** (extraído de la guía oficial de FAL):
+
+```
+Change:
+[UNA sola oración: exactamente qué debe cambiar]
+
+Preserve:
+[lista de TODO lo que NO debe tocar: fondo, iluminación, encuadre, composición, sombras]
+
+Constraints:
+[sin objetos extra, sin rediseño, sin marcas de agua, sin cambios de fondo]
+```
+
+**Ejemplo real:**
+```
+Change:
+Replace the white dropper serum bottle with the dark rectangular AFNAN 9pm REBEL perfume bottle from Image 2.
+
+Preserve:
+Background red-to-burgundy gradient, reflective acrylic surface, dramatic backlight, low camera angle, depth of field, composition, lighting, shadows.
+
+Constraints:
+No extra objects. No redesign. No logo drift. No watermark. No background changes.
+```
+
+**ANTI-PATRÓN — NUNCA usar este formato:**
+```
+❌ "Premium product photography, dramatic cosmetic advertisement replica. Deep red to burgundy gradient..."
+```
+Este formato de párrafo creativo le da libertad al modelo para reinterpretar. Usar SIEMPRE Change/Preserve/Constraints.
 
 ---
 
