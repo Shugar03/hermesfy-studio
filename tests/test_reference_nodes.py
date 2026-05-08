@@ -317,33 +317,106 @@ class TestReferenceNodeExecutor:
         assert "https://example.com/layout.jpg" in str(resolved_url)
 
     @pytest.mark.asyncio
-    async def test_int003_multiple_refs_in_workflow(self):
-        """INT-003: Multiple REFERENCE_IMAGE nodes coexist in one workflow."""
-        from hermesfy.dag.executor import execute
+    async def test_int004_list_references_resolved(self):
+        """INT-004: Lists of {{refs}} are resolved element by element."""
+        from hermesfy.dag.executor import execute, _resolve_value
         
-        class CountingProvider:
+        # Unit test first: _resolve_value handles lists
+        outputs = {
+            "r1": {"image_url": "https://example.com/a.jpg"},
+            "r2": {"image_url": "https://example.com/b.jpg"},
+        }
+        result = _resolve_value(["{{r1}}", "{{r2}}"], outputs)
+        assert result == ["https://example.com/a.jpg", "https://example.com/b.jpg"]
+        
+        # Integration: full executor with list references
+        class CaptureProvider:
             def __init__(self):
-                self.gen_count = 0
+                self.last_config = None
             async def generate(self, node_type: str, config: dict) -> dict:
-                ntype = config.get("_node_type", "")
-                if ntype in ("image_gen", "img2img"):
-                    self.gen_count += 1
-                return {"image_url": "https://example.com/out.png"}
+                self.last_config = dict(config)
+                return {"image_url": "https://example.com/output.png"}
         
         nodes = [
             Node(id="r1", type=NodeType.REFERENCE_IMAGE,
                  config={"image_url": "https://example.com/a.jpg"}),
             Node(id="r2", type=NodeType.REFERENCE_IMAGE,
                  config={"image_url": "https://example.com/b.jpg"}),
-            Node(id="r3", type=NodeType.REFERENCE_IMAGE,
-                 config={"image_url": "https://example.com/c.jpg"}),
             Node(id="gen1", type=NodeType.IMAGE_GEN,
-                 config={"model": "flux-dev", "prompt": "test"}),
+                 config={
+                     "model": "flux-dev",
+                     "reference_images": ["{{r1}}", "{{r2}}"],
+                 }),
         ]
-        wf = Workflow(id="wf", name="test", nodes=nodes, edges=[])
-        provider = CountingProvider()
+        edges = [
+            Edge(source="r1", target="gen1"),
+            Edge(source="r2", target="gen1"),
+        ]
+        wf = Workflow(id="wf", name="test", nodes=nodes, edges=edges)
+        provider = CaptureProvider()
         async for event in execute(wf, provider):
             pass
         
-        # Only gen1 should have been called (3 refs are pass-through)
-        assert provider.gen_count == 1
+        refs = provider.last_config.get("reference_images", [])
+        assert "https://example.com/a.jpg" in refs
+        assert "https://example.com/b.jpg" in refs
+
+
+class TestVRHReferenceNodeIntegration:
+    """End-to-end VRH workflow with reference nodes."""
+    
+    @pytest.mark.asyncio
+    async def test_vrh_workflow_with_refs(self):
+        """Full VRH pipeline: 2 ref images → generation node."""
+        from hermesfy.dag.executor import execute
+        
+        class FullCaptureProvider:
+            def __init__(self):
+                self.configs = []
+            async def generate(self, node_type: str, config: dict) -> dict:
+                self.configs.append(dict(config))
+                return {"image_url": "https://output.example.com/final.png"}
+        
+        nodes = [
+            Node(id="ref-layout", type=NodeType.REFERENCE_IMAGE, config={
+                "image_url": "https://refs.example.com/layout.jpg",
+                "label": "Underwater Scene", "reference_role": "layout",
+            }),
+            Node(id="ref-subject", type=NodeType.REFERENCE_IMAGE, config={
+                "image_url": "https://refs.example.com/vichy.jpg",
+                "label": "Vichy Bottle", "reference_role": "subject",
+            }),
+            Node(id="prompt", type=NodeType.TEXT_PROMPT, config={
+                "prompt": "Replace bottle with Vichy. Keep underwater scene.",
+            }),
+            Node(id="gen", type=NodeType.IMAGE_GEN, config={
+                "model": "openai/gpt-image-2/edit",
+                "prompt": "{{prompt}}",
+                "image_url": "{{ref-layout}}",
+                "reference_images": ["{{ref-layout}}", "{{ref-subject}}"],
+                "width": 1080, "height": 1920,
+            }),
+        ]
+        edges = [
+            Edge(source="ref-layout", target="gen"),
+            Edge(source="ref-subject", target="gen"),
+            Edge(source="prompt", target="gen"),
+        ]
+        wf = Workflow(id="wf-vrh-full", name="VRH Full Test", nodes=nodes, edges=edges)
+        provider = FullCaptureProvider()
+        async for event in execute(wf, provider):
+            pass
+        
+        config = provider.configs[0]
+        
+        # All references must be resolved
+        assert "https://refs.example.com/layout.jpg" == config.get("image_url")
+        refs = config.get("reference_images", [])
+        assert "https://refs.example.com/layout.jpg" in refs
+        assert "https://refs.example.com/vichy.jpg" in refs
+        
+        # Prompt must be resolved
+        assert "Replace bottle with Vichy" in config.get("prompt", "")
+        
+        # Provider should only be called once (only gen node)
+        assert len(provider.configs) == 1

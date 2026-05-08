@@ -79,6 +79,8 @@ def _resolve_inputs(config: dict, outputs: dict[str, Any]) -> dict:
 
     Replaces pattern {{node_id.output}} with outputs[node_id].
 
+    Handles lists by resolving references in each element.
+
     Args:
         config: The node configuration dict to resolve.
         outputs: A mapping of node_id → output data from completed upstream nodes.
@@ -89,33 +91,54 @@ def _resolve_inputs(config: dict, outputs: dict[str, Any]) -> dict:
     resolved: dict = {}
 
     for key, value in config.items():
-        if not isinstance(value, str):
-            resolved[key] = value
-            continue
-
-        # Find all {{...}} references in the string
-        matches = list(_REF_PATTERN.finditer(value))
-        if not matches:
-            resolved[key] = value
-            continue
-
-        # If the value is entirely a single reference, replace with the actual value
-        full_match = _REF_PATTERN.fullmatch(value.strip())
-        if full_match:
-            ref = full_match.group(1)
-            resolved[key] = _lookup_ref(ref, outputs)
-        else:
-            # Multiple references or mixed content — substitute inline
-            result = value
-            for m in matches:
-                ref = m.group(1)
-                replacement = _lookup_ref(ref, outputs)
-                if isinstance(replacement, dict):
-                    replacement = str(replacement)
-                result = result.replace(m.group(0), str(replacement) if replacement else m.group(0))
-            resolved[key] = result
+        resolved[key] = _resolve_value(value, outputs)
 
     return resolved
+
+
+def _resolve_value(value: Any, outputs: dict[str, Any]) -> Any:
+    """Resolve {{refs}} in a value, handling strings, lists, and nested structures.
+
+    Args:
+        value: The value to resolve (str, list, dict, or other).
+        outputs: Upstream node outputs.
+
+    Returns:
+        Resolved value with {{refs}} replaced.
+    """
+    # Lists: resolve each element
+    if isinstance(value, list):
+        return [_resolve_value(item, outputs) for item in value]
+
+    # Dicts: resolve each value (shallow)
+    if isinstance(value, dict):
+        return {k: _resolve_value(v, outputs) for k, v in value.items()}
+
+    # Non-strings: pass through unchanged
+    if not isinstance(value, str):
+        return value
+
+    # ── String resolution ──
+    # Find all {{...}} references in the string
+    matches = list(_REF_PATTERN.finditer(value))
+    if not matches:
+        return value
+
+    # If the value is entirely a single reference, replace with the actual value
+    full_match = _REF_PATTERN.fullmatch(value.strip())
+    if full_match:
+        ref = full_match.group(1)
+        return _lookup_ref(ref, outputs)
+
+    # Multiple references or mixed content — substitute inline
+    result = value
+    for m in matches:
+        ref = m.group(1)
+        replacement = _lookup_ref(ref, outputs)
+        if isinstance(replacement, dict):
+            replacement = str(replacement)
+        result = result.replace(m.group(0), str(replacement) if replacement else m.group(0))
+    return result
 
 
 def _lookup_ref(ref: str, outputs: dict[str, Any]) -> Any:
