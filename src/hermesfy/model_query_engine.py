@@ -105,6 +105,43 @@ _ESTIMATED_COSTS: dict[str, float] = {
 
 _DEFAULT_COST = 0.04  # Conservative estimate for unknown models
 
+# ── V2: Curated model quality ─────────────────────────────────────────────────
+
+_CURATED_MODELS: dict[str, float] = {
+    "openai/gpt-image-2": 0.12,
+    "openai/gpt-image-2/edit": 0.12,
+    "fal-ai/nano-banana-pro": 0.12,
+    "fal-ai/nano-banana-pro/edit": 0.12,
+    "fal-ai/nano-banana-2": 0.08,
+    "fal-ai/nano-banana-2/edit": 0.10,
+    "fal-ai/bytedance/seedream/v4.5/edit": 0.10,
+    "fal-ai/bytedance/seedream/v5/lite/edit": 0.10,
+    "fal-ai/bytedance/seedream/v4/edit": 0.08,
+    "fal-ai/gemini-3-pro-image-preview/edit": 0.08,
+    "fal-ai/flux-2-pro": 0.08,
+    "fal-ai/flux-pro/v1.1": 0.06,
+    "fal-ai/flux-2-pro/edit": 0.08,
+    "fal-ai/ideogram/v3": 0.08,
+    "xai/grok-imagine-image": 0.04,
+    "fal-ai/flux/schnell": 0.02,
+}
+
+_UTILITY_PATTERNS = [
+    "tiling", "material", "character", "lora", "inpaint", "remove",
+    "demucs", "sam", "birefnet", "bria", "topaz", "seedvr",
+    "clarity", "moondream", "florence", "llava", "video", "3d", "audio",
+]
+
+_CONTENT_AFFINITY: dict[str, list[str]] = {
+    "beauty": ["nano-banana-pro", "nano-banana-2", "gpt-image-2", "seedream", "gemini"],
+    "product": ["gpt-image-2", "seedream", "nano-banana-pro", "flux-2-pro", "flux-pro"],
+    "luxury": ["nano-banana-pro", "gpt-image-2", "flux-2-pro"],
+    "food": ["gpt-image-2", "nano-banana-pro", "flux-2-pro"],
+    "fitness": ["flux-2-pro", "gpt-image-2", "nano-banana-pro"],
+    "tech": ["flux-2-pro", "gemini", "gpt-image-2"],
+    "social": ["gpt-image-2", "ideogram", "nano-banana-2", "schnell"],
+}
+
 
 # ── Engine ────────────────────────────────────────────────────────────────────
 
@@ -277,131 +314,102 @@ class ModelQueryEngine:
 
         return candidates
 
-    # ── Scoring ────────────────────────────────────────────────────────────
+    # ── V2 Scoring (QUALITY + TASK_FIT + COST + SPEED) ─────────────────────
 
     def _score(self, caps: dict, task: TaskSpec) -> tuple[float, list[str]]:
-        """Score a model for a task. Returns (score, reasons)."""
+        """V2: QUALITY(0.40) + TASK_FIT(0.35) + COST(0.15) + SPEED(0.10)."""
         reasons: list[str] = []
-        weights = self._get_weights(task)
-
-        scores: dict[str, float] = {}
+        eid = caps.get("endpoint_id", "")
         provider = caps.get("provider", "")
+        tags = caps.get("tags", [])
+        category = caps.get("category", "")
 
-        # Context preservation
-        ctx_score = 0.0
-        if caps.get("supports_mask"):
-            ctx_score += 0.35
-            reasons.append("mask-capable")
-        if caps.get("supports_image_input"):
-            ctx_score += 0.25
-        if caps.get("supports_multiple_refs"):
-            ctx_score += 0.20
-            reasons.append(f"multi-ref({caps.get('max_reference_images','?')})")
-        if caps.get("supports_strength"):
-            ctx_score += 0.20
-        ctx_score = min(ctx_score, 1.0)
-        scores["context"] = ctx_score
+        # --- QUALITY (0-1) ---
+        quality = 0.0
+        provider_bonus = {
+            "openai": 0.25, "bytedance": 0.22, "google": 0.20,
+            "ideogram": 0.18, "fal-ai": 0.15, "xai": 0.12,
+        }
+        quality += provider_bonus.get(provider, 0.10)
+        if "realism" in tags: quality += 0.08
+        if "typography" in tags: quality += 0.08
+        quality += _CURATED_MODELS.get(eid, 0.0)
 
-        # Product fidelity
-        fid_score = 0.0
-        if caps.get("supports_seed"):
-            fid_score += 0.30
-        if caps.get("supports_strength"):
-            fid_score += 0.30
-        fid_score += _PROVIDER_REPUTATION.get(provider, 0.0)
-        fid_score = min(fid_score + 0.40, 1.0)  # base 0.40 for image models
-        scores["fidelity"] = fid_score
+        # Anti-bonus: utility models
+        for pat in _UTILITY_PATTERNS:
+            if pat in eid.lower():
+                quality -= 0.10
+                if quality <= 0.05:
+                    return 0.0, ["utility-filtered"]
+                break
+        quality = min(max(quality, 0.0), 1.0)
 
-        # Text quality
-        text_score = 0.0
-        if "typography" in caps.get("tags", []):
-            text_score += 0.50
-            reasons.append("typography-tagged")
-        if provider == "openai":
-            text_score += 0.30
-        elif provider == "fal-ai":
-            if "ideogram" in caps.get("endpoint_id", ""):
-                text_score += 0.35
-        text_score = min(text_score + 0.20, 1.0)  # base 0.20
-        scores["text"] = text_score
-
-        # Cost efficiency
-        cost = self._estimate_cost(caps.get("endpoint_id", ""))
-        if task.max_budget > 0:
-            cost_score = max(0.0, 1.0 - (cost / task.max_budget))
+        # --- TASK_FIT (0-1) ---
+        task_fit = 0.0
+        if task.action == "generate" and category == "text-to-image":
+            task_fit += 0.30
+        elif task.action in ("edit", "composite") and category == "image-to-image":
+            task_fit += 0.30
         else:
-            cost_score = 0.5
+            task_fit -= 0.20
+
+        # Required capabilities
+        if task.reference_count >= 2 and not caps.get("supports_multiple_refs"):
+            return 0.0, ["lacks-multi-ref"]
+        if task.needs_mask and not caps.get("supports_mask"):
+            return 0.0, ["lacks-mask"]
+
+        # Bonus capabilities
+        if task.action in ("edit", "composite") and caps.get("supports_image_input"):
+            task_fit += 0.15
+        if caps.get("supports_mask"):
+            task_fit += 0.08
+            reasons.append("mask-capable")
+
+        # Text affinity
+        if task.needs_text:
+            if "typography" in tags or provider == "openai":
+                task_fit += 0.15
+                reasons.append("typography")
+            else:
+                task_fit -= 0.05
+
+        # Content type affinity
+        for keyword in _CONTENT_AFFINITY.get(task.content_type, []):
+            if keyword in eid:
+                task_fit += 0.10
+                reasons.append(f"affinity:{keyword}")
+                break
+        task_fit = min(max(task_fit, 0.0), 1.0)
+
+        # --- COST (0-1) ---
+        cost = self._estimate_cost(eid)
+        if cost <= 0.01:      cost_score = 0.95
+        elif cost <= 0.03:    cost_score = 0.85
+        elif cost <= 0.05:    cost_score = 0.70
+        elif cost <= 0.08:    cost_score = 0.50
+        elif cost <= 0.15:    cost_score = 0.25
+        else:                 cost_score = 0.10
         if cost <= 0.01:
             reasons.append(f"cheap(${cost:.3f})")
-        scores["cost"] = cost_score
+        reasons.append(f"res={caps.get('max_resolution','1K')}")
 
-        # Speed
+        # --- SPEED (0-1) ---
         if caps.get("supports_thinking"):
-            speed_score = 0.3  # thinking models are slower
-        elif caps.get("category") == "text-to-image" and caps.get("num_input_params", 99) < 8:
-            speed_score = 0.9  # simple text-to-image = fast
+            speed_score = 0.3
+        elif category == "text-to-image" and caps.get("num_input_params", 99) < 8:
+            speed_score = 0.9
         else:
             speed_score = 0.6
-        reasons.append(f"res={caps.get('max_resolution','1K')}")
-        scores["speed"] = speed_score
 
-        # Weighted sum
-        total = 0.0
-        for metric, weight in weights.items():
-            total += weight * scores.get(metric, 0.5)
-
-        return total, reasons
-
-    def _get_weights(self, task: TaskSpec) -> dict[str, float]:
-        """Get metric weights based on task type."""
-        if task.needs_text:
-            return {
-                "context": 0.15,
-                "fidelity": 0.20,
-                "text": 0.35,
-                "cost": 0.15,
-                "speed": 0.15,
-            }
-        if task.action == "composite":
-            return {
-                "context": 0.45,
-                "fidelity": 0.25,
-                "text": 0.05,
-                "cost": 0.15,
-                "speed": 0.10,
-            }
-        if task.action == "edit":
-            return {
-                "context": 0.35,
-                "fidelity": 0.30,
-                "text": 0.10,
-                "cost": 0.15,
-                "speed": 0.10,
-            }
-        # generate (default)
-        if task.prioritize == "cost":
-            return {
-                "context": 0.10,
-                "fidelity": 0.15,
-                "text": 0.05,
-                "cost": 0.50,
-                "speed": 0.20,
-            }
-        if task.prioritize == "speed":
-            return {
-                "context": 0.10,
-                "fidelity": 0.15,
-                "text": 0.05,
-                "cost": 0.20,
-                "speed": 0.50,
-            }
-        return {
-            "context": 0.20,
-            "fidelity": 0.30,
-            "text": 0.10,
-            "cost": 0.20,
-            "speed": 0.20,
-        }
+        # --- WEIGHTED SUM ---
+        total = (
+            quality * 0.40
+            + task_fit * 0.35
+            + cost_score * 0.15
+            + speed_score * 0.10
+        )
+        return round(total, 3), reasons
 
     def _estimate_cost(self, model_id: str) -> float:
         """Estimate cost for a model."""
