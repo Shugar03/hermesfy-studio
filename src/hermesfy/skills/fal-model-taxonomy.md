@@ -289,9 +289,35 @@ SAM 3 → prompt "white dropper bottle" → máscara binaria
 
 ## REGLAS DE ORO TRANSVERSALES
 
-1. **NUNCA improvisar el formato de prompt** — cada familia tiene el suyo
-2. **Separar CHANGE de PRESERVE** — aplica a GPT Image, Nano Banana, Qwen
-3. **Hechos visuales > adjetivos vagos** — "overcast daylight" no "beautiful"
-4. **Una revisión por turno** — no pedir 5 cambios en un solo prompt
-5. **Máscara para edición quirúrgica** — SAM 3 + modelo edit con mask_url
-6. **Siempre terminar con constraints** — "No other changes. Keep everything else identical."
+1. **NUNCA improvisar el formato de prompt** — cada familia tiene el suyo. Antes de usar un modelo, buscar su guía de prompting oficial en `fal.ai/learn/` o `fal.ai/models/<endpoint>`. Jamás escribir un prompt genérico para un modelo que no conocés.
+
+2. **Separar CHANGE de PRESERVE** — aplica a GPT Image, Nano Banana, Qwen. El formato `Change:/Preserve:/Constraints:` es el patrón más efectivo descubierto. Un párrafo creativo de 300 palabras NUNCA va a igualar la precisión de este formato estructurado.
+
+3. **Hechos visuales > adjetivos vagos** — "overcast daylight, brushed aluminum, chipped paint" no "stunning, incredible, beautiful, masterpiece". Los adjetivos vagos le dan libertad al modelo para inventar. Los hechos visuales lo atan a la realidad.
+
+4. **Una revisión por turno** — no pedir 5 cambios en un solo prompt. "Make the light warmer. Keep everything else the same." Una instrucción por pasada.
+
+5. **Máscara para edición quirúrgica** — SAM 3 + modelo edit con mask_url. Este pipeline (descubierto en testing real) es el ÚNICO approach que logra editar solo el área targeteada sin tocar el resto. Sin máscara, cualquier modelo "edit" es solo img2img con instrucciones — va a regenerar todo.
+
+6. **Siempre terminar con constraints** — "No other changes. Keep everything else identical. No watermark. No redesign. No extra objects."
+
+## ⛔ ANTI-PATRONES (errores que queman créditos)
+
+| Anti-patrón | Por qué falla | Corrección |
+|-------------|---------------|------------|
+| Usar FLUX schnell para edición | Es generador, no editor — inventa todo de cero | Usar modelo edit con máscara |
+| Prompt de 300 palabras en un párrafo | El modelo no sabe qué es prioritario | Usar `Change:/Preserve:/Constraints:` |
+| Probar modelos uno por uno sin investigar | 780 modelos, 5 intentos c/u = créditos ∞ | Buscar la guía de prompting del modelo PRIMERO |
+| Hardcodear una matriz de selección | 40 celdas no representan 780 modelos | Query dinámico: filtrar → rankear → top 5 |
+| Mismo prompt para todas las familias | Cada familia tiene su formato específico | Aplicar el patrón documentado en esta taxonomía |
+| Elegir modelo por AdType solamente | Ignora task type (generar vs editar vs compositar) | Considerar: task_type + reference_count + budget + necesita_texto |
+
+## 🔬 LECCIONES DE TESTING REAL (Mayo 2026)
+
+1. **El formato Change/Preserve/Constraints fue el breakthrough.** Probado con GPT Image 2 Edit + SAM 3 mask en un task de reemplazo de producto (The Ordinary serum → perfume AFNAN). Este formato logró preservar fondo, iluminación, ángulo y superficie mientras solo cambiaba el producto.
+
+2. **Seedream 4.5 Edit es el mejor para compositing multi-imagen.** Probado con 2 imágenes de referencia (escena + producto), preservó el 90% de la escena original. La clave: asignar roles explícitos a cada imagen de referencia.
+
+3. **Sin máscara, ningún modelo puede editar quirúrgicamente.** Todos los modelos "edit" sin máscara son img2img con prompt — regeneran la escena completa, no solo el área targeteada. SAM 3 + máscara es el único approach confiable.
+
+4. **FAL tiene guías de prompting oficiales por modelo.** `fal.ai/learn/tools/prompting-gpt-image-2` fue la fuente que cambió todo. Cada modelo/familia tiene documentación de prompting en `fal.ai/learn/` — siempre buscar antes de usar.
