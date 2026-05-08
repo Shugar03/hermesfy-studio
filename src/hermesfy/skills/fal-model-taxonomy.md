@@ -1,9 +1,10 @@
 ---
 name: fal-model-taxonomy
 description: >-
-  Taxonomía completa de los 780 modelos de FAL.ai agrupados en 12 familias
+  Taxonomía completa de los 1333 modelos de FAL.ai agrupados en 12 familias
   con patrones de prompting documentados. Guía de selección de modelo
   según tipo de task. Symlink al repo de Hermesfy Studio.
+  Complementa a ModelQueryEngine (selección dinámica basada en capacidades).
 ---
 
 # FAL Model Taxonomy — 12 Familias de Prompting
@@ -124,6 +125,41 @@ Constraints:
 - `mask_image_url`: edición quirúrgica pixel-perfect (solo toca el área blanca)
 - `quality`: `low`/`medium`/`high`
 - `input_fidelity`: `high` para preservar la imagen original
+
+**⚠️ QUIRK — `image_urls` es ARRAY, no string (descubierto Mayo 2026):**
+
+El campo se llama `image_urls` (plural) y requiere **JSON array**, no string simple.
+Esto aplica a **GPT Image 2, Grok Imagine, y Seedream** — los 3 usan el mismo patrón.
+Costó 3 intentos fallidos y un timeout de 120s en testing real.
+
+```bash
+# ❌ INCORRECTO — Validation error: "Input should be a valid list"
+genmedia run openai/gpt-image-2/edit \
+  --image_url "https://cdn.fal.media/file.jpg" ...
+
+# ❌ INCORRECTO — Validation error: "image_urls: Field required"  
+genmedia run openai/gpt-image-2/edit \
+  --image_url "https://cdn.fal.media/file.jpg" ...  # wrong flag name
+
+# ✅ CORRECTO — image_urls como JSON array (aplica a GPT-2, Grok, Seedream)
+genmedia run openai/gpt-image-2/edit \
+  --image_urls '["https://cdn.fal.media/file.jpg"]' ...
+
+genmedia run xai/grok-imagine-image/quality/edit \
+  --image_urls '["https://cdn.fal.media/file.jpg"]' ...
+
+genmedia run fal-ai/bytedance/seedream/v5/lite/edit \
+  --image_urls '["https://cdn.fal.media/file.jpg"]' ...
+
+# ✅ También correcto con múltiples referencias
+genmedia run openai/gpt-image-2/edit \
+  --image_urls '["https://cdn.fal.media/layout.jpg", "https://cdn.fal.media/subject.jpg"]' ...
+```
+
+**Pitfall común:** asumir que `--image_url` (singular) funciona como en otros modelos FLUX. 
+GPT Image 2, Grok, y Seedream usan `--image_urls` (plural, array). Siempre verificar con `genmedia schema <model>` antes de ejecutar.
+También notar que `image_url` singular existe en el schema pero es distinto de `image_urls` — 
+usar el flag equivocado da "Field required" en vez de "list_type", lo que despista el debug.
 
 ---
 
@@ -311,6 +347,81 @@ SAM 3 → prompt "white dropper bottle" → máscara binaria
 | Hardcodear una matriz de selección | 40 celdas no representan 780 modelos | Query dinámico: filtrar → rankear → top 5 |
 | Mismo prompt para todas las familias | Cada familia tiene su formato específico | Aplicar el patrón documentado en esta taxonomía |
 | Elegir modelo por AdType solamente | Ignora task type (generar vs editar vs compositar) | Considerar: task_type + reference_count + budget + necesita_texto |
+
+## 🖥️ EJECUCIÓN PRÁCTICA CON GENMEDIA CLI
+
+### Sourcing de la API Key
+
+La key está en `/home/hermes/.hermes/.env` como `FAL_API_KEY`.  
+**Siempre exportar como `FAL_KEY`** (genmedia espera esta variable, no `FAL_API_KEY`):
+
+```bash
+export FAL_KEY="$(grep FAL_API_KEY /home/hermes/.hermes/.env | cut -d= -f2)"
+```
+
+⚠️ **Pitfall:** `genmedia` busca `FAL_KEY`, NO `FAL_API_KEY`. Si usás la variable equivocada, el error es `"No fal.ai API key found"` a pesar de que la key existe en el entorno.
+
+### Subir imágenes de referencia
+
+Las imágenes locales deben subirse al CDN de FAL antes de usarse en modelos edit:
+
+```bash
+# Subir
+genmedia upload /path/to/image.jpg
+# → {"cdn_url": "https://v3b.fal.media/files/.../img.jpg"}
+
+# Usar la cdn_url retornada en el modelo
+genmedia run openai/gpt-image-2/edit \
+  --image_urls '["https://v3b.fal.media/files/.../img.jpg"]' ...
+```
+
+### Comando completo de edición (template)
+
+```bash
+export FAL_KEY="$(grep FAL_API_KEY /home/hermes/.hermes/.env | cut -d= -f2)"
+
+# 1. Subir referencia
+CDN_URL=$(genmedia upload /path/to/reference.jpg | jq -r '.cdn_url')
+
+# 2. Ejecutar edición
+genmedia run openai/gpt-image-2/edit \
+  --image_urls "[\"$CDN_URL\"]" \
+  --prompt "Change: [qué cambia]
+Preserve: [qué se mantiene]
+Constraints: [restricciones]" \
+  --quality medium \
+  --input_fidelity high
+```
+
+### Costos de edición observados (Mayo 2026)
+
+| Modelo | Precio | Resolución máx | Resultado |
+|--------|--------|---------------|-----------|
+| `openai/gpt-image-2/edit` | ~$0.05 (1 unit flat) | 1K (1024px) | Mejor calidad, preserva logos/textos |
+| `fal-ai/bytedance/seedream/v5/lite/edit` | ~$0.03 | 1K nominal (genera hasta 4K real) | Buena calidad, upscalea agresivamente |
+| `xai/grok-imagine-image/quality/edit` | ~$0.022 ($0.00017/compute-sec) | 2K (2048px) | Más barato, calidad aceptable |
+
+### Comportamiento comparativo en edición (probado Mayo 2026)
+
+**Task:** Cambiar color de esmalte rojo → azul en 6 botellas Chanel sobre tablero de ajedrez.
+
+| Comportamiento | GPT Image 2 | Grok Imagine | Seedream Lite |
+|---------------|:-----------:|:------------:|:-------------:|
+| **Cambio principal** (rojo→azul) | ✅ Perfecto | ✅ Perfecto | ✅ Perfecto |
+| **Preserva overlays UI** (QR, fecha, "Views") | ❌ Los limpia | ✅ Los preserva | ✅ Los preserva |
+| **Detalles creativos no pedidos** | — | ✅ Uñas azules | — |
+| **Fidelidad quirúrgica** | ✅ Máxima | Media-Alta | Alta |
+| **Upscaling** | No | No | ✅ 2× (736→1728) |
+| **Formato output** | PNG | JPEG | PNG |
+| **Tamaño archivo** | 972 KB | 246 KB | 2.3 MB |
+| **Resolución output** | 736×976 | 880×1168 | 1728×2304 |
+
+**Regla empírica:**  
+- **GPT Image 2** = el más quirúrgico. Limpia todo lo que no está en Preserve. Mejor para edición con marca/logos.  
+- **Grok Imagine** = el más creativo. Preserva contexto pero puede agregar detalles no pedidos. Mejor para edición barata.  
+- **Seedream Lite** = balanceado pero upscalea de más. Mejor si necesitás alta resolución.
+
+---
 
 ## 🔬 LECCIONES DE TESTING REAL (Mayo 2026)
 
