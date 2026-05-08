@@ -1,4 +1,8 @@
-"""Tool: hermesfy_execute_workflow — execute a workflow's DAG and return results."""
+"""Tool: hermesfy_execute_workflow — execute a workflow's DAG and return results.
+
+V5: VRHGate integration — blocks execution if workflow has visual references
+     but VRH preview has not been shown and approved by the user.
+"""
 
 import asyncio
 import json
@@ -6,6 +10,7 @@ import json
 from hermesfy.dag.executor import execute
 from hermesfy.rendering.canvas import render_minimal_canvas
 from hermesfy.tools.workflows import get_workflow, set_workflow_states
+from hermesfy.vrh_gate import VRHGate, VRHBlocked, gate as vrh_gate
 
 # Try to use GenmediaProvider, but fall back gracefully if not possible
 try:
@@ -33,6 +38,36 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
     workflow = get_workflow(workflow_id)
     if workflow is None:
         return json.dumps({"error": {"code": "NODE_NOT_FOUND", "message": f"Workflow '{workflow_id}' not found"}})
+
+    # ── V5: VRH Gate — detect visual references and require preview ──────
+    reference_count = _count_references(workflow)
+    has_references = reference_count > 0
+
+    if has_references:
+        # Auto-register if not already tracked
+        state = vrh_gate.get_state(workflow_id)
+        if state is None:
+            vrh_gate.require_preview(
+                workflow_id,
+                reference_count=reference_count,
+                has_references=True,
+            )
+
+        try:
+            vrh_gate.check(workflow_id)
+        except VRHBlocked as e:
+            return json.dumps({
+                "error": {
+                    "code": "VRH_GATE_BLOCKED",
+                    "message": str(e),
+                    "detail": {
+                        "workflow_id": workflow_id,
+                        "reference_count": reference_count,
+                        "required_action": "Run VRH FASE 1 (VisualAnalyzer) + FASE 2 (Preview) first. "
+                                          "Load skill 'hermesfy-vrh-workflow' for the full pipeline.",
+                    }
+                }
+            })
 
     # Use GenmediaProvider if genmedia CLI is installed, fall back to FalProvider, then mock
     provider = None
@@ -112,3 +147,43 @@ def execute_workflow(workflow_id: str, quality_config: dict | None = None) -> st
     if node_errors:
         result["node_errors"] = node_errors
     return json.dumps(result)
+
+
+# ── V5: Reference detection for VRH Gate ─────────────────────────────────
+
+def _count_references(workflow) -> int:
+    """Count how many reference images a workflow uses.
+
+    Scans all node configs for image_url, reference_images, image_urls,
+    and mask_url fields. Used by VRHGate to determine if preview is required.
+
+    Args:
+        workflow: Workflow object with nodes.
+
+    Returns:
+        Number of distinct reference images detected.
+    """
+    ref_urls: set = set()
+
+    for node in workflow.nodes:
+        config = node.config if hasattr(node, 'config') else {}
+
+        # Single image URL
+        for key in ('image_url', 'mask_url', 'reference_url'):
+            url = config.get(key, '')
+            if url and isinstance(url, str) and url.startswith(('http', 'file', '/')):
+                ref_urls.add(url)
+
+        # Multiple image URLs (list)
+        for key in ('image_urls', 'reference_images', 'reference_urls'):
+            urls = config.get(key, [])
+            if isinstance(urls, list):
+                for url in urls:
+                    if isinstance(url, str) and url.startswith(('http', 'file', '/')):
+                        ref_urls.add(url)
+                    elif isinstance(url, dict):
+                        img_url = url.get('url', url.get('image_url', ''))
+                        if img_url and isinstance(img_url, str):
+                            ref_urls.add(img_url)
+
+    return len(ref_urls)

@@ -19,11 +19,43 @@ No hay atajos. No hay bypass. No hay "voy directo a genmedia".
 
 ## 🔴 ANTI-BYPASS — LEER ANTES DE CUALQUIER ACCIÓN
 
+### ⛔ HARD BLOCK (CÓDIGO) — V5
+
+**A partir de V5, el código MISMO bloquea la ejecución.** 
+`execute_workflow()` verifica `VRHGate` antes de ejecutar cualquier DAG.
+Si el workflow tiene imágenes de referencia y no pasaste por FASE 2 (preview aprobado),
+el executor devuelve `VRH_GATE_BLOCKED` y no genera nada.
+
+**Esto NO es opcional. El código te fuerza.** 
+Si intentás ejecutar un workflow con referencias sin preview, el error es explícito.
+
+### Cómo interactuar con el VRHGate (el agente debe hacer esto)
+
+```python
+from hermesfy.vrh_gate import gate
+
+# 1. Después de FASE 1 (VisualAnalyzer): registrar que este workflow requiere VRH
+gate.require_preview(workflow_id, reference_count=N, has_references=True)
+
+# 2. Después de FASE 2 (Preview mostrado al usuario): guardar el preview
+gate.set_preview(workflow_id, preview_text)
+
+# 3. Cuando el usuario confirma ("ok", "dale", "generá"):
+gate.approve(workflow_id, fidelity=0.95)
+
+# 4. Si el usuario rechaza ("no, ajustá X"):
+gate.reject(workflow_id)
+# → volver a FASE 1 o 2
+```
+
+### Checklist del agente (NUNCA omitir)
+
 Si estás a punto de llamar a `terminal(genmedia run ...)` o `image_generate` o `execute_code` con generación de imagen, y NO has completado TODOS estos pasos, **DETENETE**:
 
 ```
 □ FASE 1: ¿Analicé CADA imagen con vision_analyze? 
 □ FASE 2: ¿Mostré el preview al usuario y esperé su confirmación?
+□ VRHGate: ¿Llamé a gate.approve(workflow_id) después de la confirmación?
 □ ModelSelection: ¿Consulté fal-model-taxonomy para elegir el modelo correcto?
 □ PromptFormat: ¿Usé el formato de prompting de la familia del modelo (Change/Preserve/Constraints, etc.)?
 □ FASE 3: ¿Planifiqué un DAG multi-step (no un solo modelo)?
@@ -31,7 +63,7 @@ Si estás a punto de llamar a `terminal(genmedia run ...)` o `image_generate` o 
 
 **Si alguno de estos checkboxes está vacío → NO generes. Volvé a FASE 1.**
 
-Si alguna vez te encontrás pensando "esto es simple, voy directo a genmedia" → **eso es exactamente el bypass que esta skill existe para prevenir.**
+Si alguna vez te encontrás pensando "esto es simple, voy directo a genmedia" → **eso es exactamente el bypass que esta skill existe para prevenir. Y ahora el CÓDIGO te bloquea.**
 
 ---
 
