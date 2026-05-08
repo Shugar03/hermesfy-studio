@@ -97,6 +97,7 @@ _ESTIMATED_COSTS: dict[str, float] = {
     "fal-ai/gemini-3-pro-image-preview/edit": 0.05,
     "xai/grok-imagine-image": 0.022,
     "xai/grok-imagine-image/edit": 0.022,
+    "xai/grok-imagine-image/quality/edit": 0.022,  # V3: empirically verified
     "fal-ai/ideogram/v3": 0.04,
     "fal-ai/z-image/turbo": 0.01,
     "fal-ai/flux-2": 0.05,
@@ -122,7 +123,9 @@ _CURATED_MODELS: dict[str, float] = {
     "fal-ai/flux-pro/v1.1": 0.06,
     "fal-ai/flux-2-pro/edit": 0.08,
     "fal-ai/ideogram/v3": 0.08,
-    "xai/grok-imagine-image": 0.04,
+    "xai/grok-imagine-image/quality/edit": 0.11,  # V3: top edit value
+    "xai/grok-imagine-image/edit": 0.08,
+    "xai/grok-imagine-image": 0.06,
     "fal-ai/flux/schnell": 0.02,
 }
 
@@ -133,13 +136,32 @@ _UTILITY_PATTERNS = [
 ]
 
 _CONTENT_AFFINITY: dict[str, list[str]] = {
-    "beauty": ["nano-banana-pro", "nano-banana-2", "gpt-image-2", "seedream", "gemini"],
-    "product": ["gpt-image-2", "seedream", "nano-banana-pro", "flux-2-pro", "flux-pro"],
-    "luxury": ["nano-banana-pro", "gpt-image-2", "flux-2-pro"],
+    "beauty": ["nano-banana-pro", "nano-banana-2", "gpt-image-2", "seedream", "gemini", "grok"],
+    "product": ["gpt-image-2", "grok", "seedream", "nano-banana-pro", "flux-2-pro", "flux-pro"],
+    "luxury": ["nano-banana-pro", "gpt-image-2", "grok", "flux-2-pro"],
     "food": ["gpt-image-2", "nano-banana-pro", "flux-2-pro"],
     "fitness": ["flux-2-pro", "gpt-image-2", "nano-banana-pro"],
     "tech": ["flux-2-pro", "gemini", "gpt-image-2"],
     "social": ["gpt-image-2", "ideogram", "nano-banana-2", "schnell"],
+}
+
+
+# ── V3: Task Champions (empirically validated best models per task) ───────────
+
+_TASK_CHAMPIONS: dict[str, dict[str, float]] = {
+    "edit": {
+        "xai/grok-imagine-image/quality/edit": 0.18,
+        "xai/grok-imagine-image/edit": 0.12,
+        "openai/gpt-image-2/edit": 0.15,
+        "fal-ai/gemini-3-pro-image-preview/edit": 0.10,
+    },
+    "composite": {
+        "fal-ai/bytedance/seedream/v4.5/edit": 0.20,
+    },
+    "generate": {
+        "openai/gpt-image-2": 0.12,
+        "fal-ai/nano-banana-pro": 0.12,
+    },
 }
 
 
@@ -380,6 +402,13 @@ class ModelQueryEngine:
                 task_fit += 0.10
                 reasons.append(f"affinity:{keyword}")
                 break
+
+        # V3: Task champion bonus (empirically validated best models)
+        champion_bonus = _TASK_CHAMPIONS.get(task.action, {}).get(eid, 0.0)
+        if champion_bonus > 0:
+            task_fit += champion_bonus
+            reasons.append(f"champion:{task.action}")
+
         task_fit = min(max(task_fit, 0.0), 1.0)
 
         # --- COST (0-1) ---
