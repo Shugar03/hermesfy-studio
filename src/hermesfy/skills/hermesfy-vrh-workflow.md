@@ -176,14 +176,7 @@ exec_spec = bridge.build(
 
 ### 3.2 Estrategia de modelos por tipo de task
 
-| Task type | ¿Qué modelos? | Estrategia |
-|-----------|--------------|------------|
-| **Creación desde cero** (sin referencias) | GENERATIVOS | `flux/schnell` → `gpt-image-2` → `nano-banana-pro` |
-| **Reemplazo de producto** (fidelity > 0.90) | EDIT | `gemini-3-pro-image-preview/edit` o `nano-banana-pro/edit` con `--image_urls` de layout + producto |
-| **Reemplazo con máscara** (fidelity máxima) | EDIT + máscara | `gpt-image-2/edit` o `flux/inpainting` con `--mask_url` |
-| **Texto preciso** | EDIT (tipografía) | `nano-banana-pro/edit` |
-| **Estilo artístico** | GENERATIVOS | `flux/dev` → `nano-banana-2` |
-| **Rápido/borrador** | GENERATIVO simple | `flux/schnell` solo |
+| Task type | ¿Qué modelos? | Estrategia |\n|-----------|--------------|------------|\n| **Creación desde cero** (sin referencias) | GENERATIVOS | `flux/schnell` → `gpt-image-2` → `nano-banana-pro` |\n| **Product compositing** (reemplazar producto, preservar escena) | EDIT | ⭐ **`seedream/v4.5/edit`** (PRIMARIO — diseñado para esto: hasta 10 refs, compositing espacial). Alternativa: `gemini-3-pro-image-preview/edit` (bueno pero reinterpreta). NUNCA usar generativos (FLUX/GPT-Image) para esto. |\n| **Edición con máscara** (fidelity máxima, área precisa) | EDIT + máscara | `gpt-image-2/edit` con `--mask_url`, o `flux/inpainting` |\n| **Texto preciso + tipografía** | EDIT (tipografía) | `nano-banana-pro/edit` (tags: realism, typography) |\n| **Estilo artístico / transferencia** | GENERATIVOS | `flux/dev` → `nano-banana-2` |\n| **Rápido/borrador** | GENERATIVO simple | `flux/schnell` solo |\n| **Iterativo (character consistency)** | EDIT iterativo | `flux-pro/kontext` (preserva identidad entre rondas) |
 
 ### 3.2 Ejecutar vía GenmediaProvider
 
@@ -326,3 +319,4 @@ Antes de responder al usuario, verificar:
 - `hermesfy-spec-bridge` → Conversión StructuredSpec → ExecutionSpec
 - `hermesfy-vrh-preview` → Preview visual antes de generar
 - `visual-reference-analyzer` → Análisis de imagen de referencia
+- **`fal-model-taxonomy`** → ⚠️ CARGAR SIEMPRE antes de seleccionar modelo. 12 familias, 780 modelos, patrones de prompting documentados. **NUNCA elegir modelo sin consultar esta taxonomía.**
