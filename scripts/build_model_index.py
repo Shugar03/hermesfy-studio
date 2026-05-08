@@ -57,7 +57,7 @@ for i, m in enumerate(all_models):
     if s is None:
         continue
 
-    ins = [p.get("name", "") for p in s.get("input", [])]
+    ins = [p.get("name", "") for p in (s.get("input") or [])]
     
     caps = {
         "endpoint_id": eid,
@@ -76,14 +76,14 @@ for i, m in enumerate(all_models):
     }
 
     # Multiple refs
-    for p in s.get("input", []):
+    for p in (s.get("input") or []):
         ptype = str(p.get("type", ""))
         if "array" in ptype and "image" in p.get("name", "").lower():
             caps["supports_multiple_refs"] = True
             break
 
     # Resolution
-    for p in s.get("input", []):
+    for p in (s.get("input") or []):
         dsc = p.get("description", "")
         if "4K" in dsc or "4k" in dsc:
             caps["max_resolution"] = "4K"
@@ -92,7 +92,7 @@ for i, m in enumerate(all_models):
             caps["max_resolution"] = "2K"
 
     # Max refs
-    for p in s.get("input", []):
+    for p in (s.get("input") or []):
         if "image" in p.get("name", "").lower():
             nums = [int(n) for n in re.findall(r"\b(\d+)\b", p.get("description", "")) if 2 <= int(n) <= 100]
             if nums:
