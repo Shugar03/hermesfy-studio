@@ -348,3 +348,61 @@ class ModelSelector:
     def supported_quality_levels(self) -> list[str]:
         """Return list of supported quality level values."""
         return [ql.value for ql in QualityLevel]
+
+    # ── V5: Dynamic model selection via ModelQueryEngine ───────────────────
+
+    def select_dynamic(
+        self,
+        ad_type: AdType | None = None,
+        quality: QualityLevel | None = None,
+        action: str = "generate",
+        reference_count: int = 0,
+        needs_text: bool = False,
+        needs_mask: bool = False,
+    ) -> str:
+        """Select best model using ModelQueryEngine (dynamic) with hardcoded fallback.
+
+        Tries ModelQueryEngine first. Falls back to the old matrix if
+        the index isn't available.
+
+        Returns:
+            Full FAL endpoint ID string.
+        """
+        try:
+            from hermesfy.model_query_engine import ModelQueryEngine, TaskSpec
+
+            content_type = ad_type.value if ad_type else "product"
+            budget_map = {
+                QualityLevel.BEST: 0.20,
+                QualityLevel.HIGH: 0.10,
+                QualityLevel.STANDARD: 0.05,
+                QualityLevel.BUDGET: 0.02,
+            }
+            max_budget = budget_map.get(quality, 0.10) if quality else 0.10
+
+            engine = ModelQueryEngine()
+            if engine.model_count > 0:
+                result = engine.query(
+                    TaskSpec(
+                        action=action,
+                        reference_count=reference_count,
+                        needs_text=needs_text,
+                        needs_mask=needs_mask,
+                        content_type=content_type,
+                        max_budget=max_budget,
+                    ),
+                    top_n=1,
+                )
+                if result:
+                    logger.info(
+                        "Dynamic select: %s (score=%.3f, reason=%s)",
+                        result[0].endpoint_id,
+                        result[0].score,
+                        result[0].reason,
+                    )
+                    return result[0].endpoint_id
+        except Exception as e:
+            logger.debug("ModelQueryEngine unavailable: %s", e)
+
+        # Fallback to hardcoded matrix
+        return self.select(ad_type or AdType.QUICK_DRAFT, quality or QualityLevel.HIGH)
