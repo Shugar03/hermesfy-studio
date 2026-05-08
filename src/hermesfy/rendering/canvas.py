@@ -20,6 +20,12 @@ TYPE_LABEL = {
     NodeType.IMG2IMG.value: "IMG2IMG",
     NodeType.UPSCALE.value: "UPSCALE",
     NodeType.SEED.value: "SEED",
+    NodeType.INPAINT.value: "INPAINT",
+    NodeType.OUTPAINT.value: "OUTPAINT",
+    NodeType.IP_ADAPTER.value: "IP_ADAPTER",
+    NodeType.REMOVE_BG.value: "REMOVE_BG",
+    NodeType.FACE_RESTORE.value: "FACE_RESTORE",
+    NodeType.REFERENCE_IMAGE.value: "🖼️ REF",
 }
 
 
@@ -127,7 +133,12 @@ def _config_summary(config: dict) -> str:
         parts.append(f"model={config['model']}")
     if "image_url" in config:
         u = str(config["image_url"])
-        parts.append(f"image_url={u[:20]}...")
+        # For reference_image nodes, prefer the label
+        label = config.get("label", "")
+        if label:
+            parts.append(f'🖼️ "{label}"')
+        else:
+            parts.append(f"🖼️ {u[:30]}...")
     if "seed" in config:
         parts.append(f"seed={config['seed']}")
     if "width" in config or "height" in config:

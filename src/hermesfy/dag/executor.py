@@ -270,7 +270,7 @@ async def execute(
             config["_node_type"] = node.type.value
 
         # Pass-through nodes: text_prompt and seed don't call the provider
-        PASS_THROUGH_TYPES = {NodeType.TEXT_PROMPT, NodeType.SEED}
+        PASS_THROUGH_TYPES = {NodeType.TEXT_PROMPT, NodeType.SEED, NodeType.REFERENCE_IMAGE}
         if node.type in PASS_THROUGH_TYPES:
             outputs[node_id] = config
             node_states[node_id] = NodeState.COMPLETED

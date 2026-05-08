@@ -25,6 +25,7 @@ class NodeType(str, Enum):
     IP_ADAPTER = "ip_adapter"
     REMOVE_BG = "remove_bg"
     FACE_RESTORE = "face_restore"
+    REFERENCE_IMAGE = "reference_image"
 
 
 # Required config fields per node type
@@ -39,6 +40,7 @@ REQUIRED_CONFIG: dict[NodeType, set[str]] = {
     NodeType.IP_ADAPTER: {"model", "image_url", "ip_adapter_weight", "style_strength_ratio"},
     NodeType.REMOVE_BG: {"model", "image_url"},
     NodeType.FACE_RESTORE: {"model", "image_url"},
+    NodeType.REFERENCE_IMAGE: {"image_url"},
 }
 
 
