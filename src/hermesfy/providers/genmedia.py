@@ -21,7 +21,7 @@ __all__ = ["GenmediaProvider", "PROVIDER_ERROR", "PROVIDER_AUTH"]
 PROVIDER_ERROR = "PROVIDER_ERROR"
 PROVIDER_AUTH = "PROVIDER_AUTH"
 
-DEFAULT_TIMEOUT = 180  # seconds for generation
+DEFAULT_TIMEOUT = 360  # seconds for generation (GPT Image 2 needs 3+ min)
 UPLOAD_TIMEOUT = 60    # seconds for image upload
 
 logger = logging.getLogger("hermesfy.genmedia")
@@ -46,6 +46,25 @@ _NODE_DEFAULT_MODELS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+# Models that expect image_url (singular) instead of image_urls (plural)
+_IMAGE_URL_SINGULAR_FAMILIES = [
+    "fal-ai/flux-pro/kontext",
+    "fal-ai/flux/redux",
+    "fal-ai/ideogram/",
+    "fal-ai/flux/dev/image-to-image",
+    "fal-ai/topaz/",
+    "fal-ai/clarity-upscaler",
+]
+
+
+def _model_uses_image_url_singular(model: str) -> bool:
+    """Check if this model expects image_url (singular) instead of image_urls."""
+    for family in _IMAGE_URL_SINGULAR_FAMILIES:
+        if model.startswith(family):
+            return True
+    return False
 
 
 def _extract_image_url(config: dict) -> str:
@@ -194,7 +213,10 @@ class GenmediaProvider(Provider):
         if node_type in ("img2img", "inpaint", "outpaint", "upscale", "remove_bg",
                          "face_restore", "ip_adapter"):
             if image_url:
-                args.extend(["--image_url", image_url])
+                if _model_uses_image_url_singular(model):
+                    args.extend(["--image_url", image_url])
+                else:
+                    args.extend(["--image_urls", json.dumps([image_url])])
 
         # img2img specific
         if node_type == "img2img":

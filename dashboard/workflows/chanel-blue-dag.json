@@ -1,0 +1,52 @@
+{
+  "id": "chanel-blue-dag",
+  "name": "Chanel Red→Blue Pipeline (GPT Image 2 Edit + Topaz Upscale)",
+  "nodes": [
+    {
+      "id": "ref",
+      "type": "reference_image",
+      "config": {
+        "image_url": "https://v3b.fal.media/files/b/0a995851/y1Hmlrvhg8wXp6ycbpdRR_img_2ca3a809ed7c.jpg"
+      },
+      "position": [0, 0]
+    },
+    {
+      "id": "edit",
+      "type": "img2img",
+      "config": {
+        "model": "openai/gpt-image-2/edit",
+        "image_url": "{{ref}}",
+        "prompt": "Change the red nail polish in the bottles to deep royal blue. Preserve: chessboard, chess pieces, hand, bottle caps, text, logos, lighting, reflections, composition, shadows."
+      },
+      "position": [300, 0]
+    },
+    {
+      "id": "upscale",
+      "type": "upscale",
+      "config": {
+        "model": "fal-ai/topaz/upscale/image",
+        "image_url": "{{edit}}",
+        "scale": 2
+      },
+      "position": [600, 0]
+    }
+  ],
+  "edges": [
+    {"source": "ref", "target": "edit"},
+    {"source": "edit", "target": "upscale"}
+  ],
+  "execution": {
+    "node_states": {
+      "ref": "completed",
+      "edit": "completed",
+      "upscale": "completed"
+    },
+    "node_outputs": {
+      "edit": {"url": "https://v3b.fal.media/files/b/0a99588c/Hz-DdCwx4EYoYtp9uDvpf_h4YUmRV3.png"},
+      "upscale": {"url": "https://v3b.fal.media/files/b/0a9958aa/QesSZ6FFhfikcjZ_m412w_image.jpeg"}
+    },
+    "budget": {"spent": 0.055, "max_budget": 0.25},
+    "completed_at": "2026-05-08T05:30:00Z",
+    "provider": "genmedia"
+  }
+}

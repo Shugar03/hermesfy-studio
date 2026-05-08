@@ -53,22 +53,9 @@ body {
   line-height: 1.5;
 }
 
-/* ═══ CRT OVERLAY ═══════════════════════════════════════ */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0,0,0,0.06) 0px,
-    rgba(0,0,0,0.06) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  opacity: 0.04;
-}
+/* ═══ CRT OVERLAY (disabled — causes rendering issues) ═══ */
+/* body::before { ... } — removed */
+/* body::after vignette kept for depth */
 
 /* Subtle vignette for depth */
 body::after {
@@ -639,6 +626,7 @@ body::after {
 .node-type-badge.ip_adapter { color: #60a5fa; background: rgba(96,165,250,0.1); }
 .node-type-badge.remove_bg { color: #34d399; background: rgba(52,211,153,0.1); }
 .node-type-badge.face_restore { color: #fb923c; background: rgba(251,146,60,0.1); }
+.node-type-badge.reference_image { color: #a78bfa; background: rgba(167,139,250,0.1); }
 
 .node-id-label {
   font-family: var(--font-mono);
@@ -1084,7 +1072,7 @@ body::after {
 const S = { wfs: {}, sel: null, selNode: null };
 
 const EMOJI = { pending:'\u25CB', running:'\u23F3', completed:'\u2705', failed:'\u274C', retrying:'\u27F3', quality_exhausted:'\u2620' };
-const TYPELbl = { text_prompt:'TEXT', image_gen:'GEN', img2img:'IMG2IMG', upscale:'UPSCALE', seed:'SEED', inpaint:'INPAINT', outpaint:'OUTPAINT', ip_adapter:'IP-AD', remove_bg:'RM-BG', face_restore:'FACE' };
+const TYPELbl = { text_prompt:'TEXT', image_gen:'GEN', img2img:'IMG2IMG', upscale:'UPSCALE', seed:'SEED', inpaint:'INPAINT', outpaint:'OUTPAINT', ip_adapter:'IP-AD', remove_bg:'RM-BG', face_restore:'FACE', reference_image:'REF' };
 
 function wfState(wf) {
   const ex = wf.execution;
@@ -1267,23 +1255,43 @@ async function autoLoad() {
   try {
     const r = await fetch('/workflows/');
     if (!r.ok) return;
-    const data = await r.json();
-    const files = Array.isArray(data) ? data : [];
-    for (const f of files) {
-      const name = f.Name || f.name;
-      if (!name?.endsWith('.json')) continue;
-      try {
-        const resp = await fetch('/workflows/' + name);
-        if (resp.ok) {
-          const d = await resp.json();
-          if (d.id) S.wfs[d.id] = d;
-        }
-      } catch(e) {}
+    const ct = r.headers.get('content-type') || '';
+    
+    // Try JSON first
+    if (ct.includes('json')) {
+      const data = await r.json();
+      const files = Array.isArray(data) ? data : [];
+      for (const f of files) {
+        const name = f.name || f.Name;
+        if (!name?.endsWith('.json')) continue;
+        await loadWorkflowFile(name);
+      }
+    } else {
+      // HTML directory listing — parse hrefs
+      const html = await r.text();
+      const re = /href="([^"]+\.json)"/gi;
+      const seen = new Set();
+      let m;
+      while ((m = re.exec(html)) !== null) {
+        const name = m[1];
+        if (!seen.has(name)) { seen.add(name); await loadWorkflowFile(name); }
+      }
     }
+    
     if (Object.keys(S.wfs).length) {
       S.sel = Object.keys(S.wfs)[0];
       renderSidebar();
       renderMain();
+    }
+  } catch(e) { console.warn('autoLoad failed:', e); }
+}
+
+async function loadWorkflowFile(name) {
+  try {
+    const resp = await fetch('/workflows/' + name);
+    if (resp.ok) {
+      const d = await resp.json();
+      if (d.id) S.wfs[d.id] = d;
     }
   } catch(e) {}
 }
@@ -1302,10 +1310,37 @@ const NODE_TYPES = [
   { key:'outpaint',    label:'OUTPAINT',    defaultConfig:{model:"flux-dev",image_url:"",new_width:1024,new_height:1536} },
   { key:'ip_adapter',  label:'IP ADAPTER',  defaultConfig:{model:"flux-pro",prompt:"",image_url:"",ip_adapter_weight:0.75} },
   { key:'face_restore',label:'FACE RESTORE',defaultConfig:{model:"codeformer",image_url:"",codeformer_fidelity:0.5} },
-  { key:'seed',        label:'SEED',        defaultConfig:{seed:42} }
+  { key:'seed',        label:'SEED',        defaultConfig:{seed:42} },
+  { key:'reference_image', label:'REFERENCE IMAGE', defaultConfig:{image_url:""} }
 ];
 
-const MODELS = ["flux-dev","flux-pro","clarity-upscaler","birefnet","codeformer"];
+const MODELS = [
+  // Edit models
+  "openai/gpt-image-2/edit",
+  "fal-ai/bytedance/seedream/v4.5/edit",
+  "fal-ai/nano-banana-pro/edit",
+  "fal-ai/hunyuan-image/v3/instruct/edit",
+  "fal-ai/gemini-3-pro-image-preview/edit",
+  "fal-ai/ideogram/v3/edit",
+  "fal-ai/ideogram/v3/remix",
+  "fal-ai/flux-2-pro/edit",
+  "fal-ai/flux-pro/kontext",
+  // Generation models
+  "fal-ai/flux/schnell",
+  "fal-ai/flux/dev",
+  "fal-ai/flux/pro",
+  "fal-ai/nano-banana-2",
+  "fal-ai/nano-banana-pro",
+  "openai/gpt-image-2",
+  "fal-ai/ideogram/v3",
+  // Utility models
+  "fal-ai/topaz/upscale/image",
+  "fal-ai/clarity-upscaler",
+  "fal-ai/real-esrgan",
+  "fal-ai/birefnet",
+  "fal-ai/codeformer",
+  "fal-ai/gfpgan"
+];
 
 const B = { name:'', nodes:[], nextId:1, exportJson:null };
 
@@ -1446,6 +1481,10 @@ function renderBuilderNode(n, idx) {
   if (n.type === 'face_restore') {
     fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id);
     fieldsHtml += fieldNum('Fidelity', 'codeformer_fidelity', cfg.codeformer_fidelity, n.id, true);
+  }
+
+  if (n.type === 'reference_image') {
+    fieldsHtml += fieldText('Image URL', 'image_url', cfg.image_url, n.id, true);
   }
 
   if (n.type === 'seed') {

@@ -193,9 +193,25 @@ GenmediaProvider (genmedia CLI) → FalProvider (legacy HTTP) → MockProvider (
 
 ## V5: Model Intelligence Layer (NEW)
 
-### ModelQueryEngine
+### ModelQueryEngine Scoring Calibration (v1 → v2)
 
-Replaces the hardcoded `ModelSelector` matrix with dynamic, capability-based model selection.
+**V1 Pitfall:** Capability-weighted scoring (`supports_mask` = +0.35, `supports_image_input` = +0.25) caused cheap inpainting utilities to outrank quality models. `z-image/turbo/inpaint` ($0.01) ranked #1 for composite tasks over GPT Image 2.
+
+**V2 Fix:** Three-component scoring model found in `model_query_engine.py._score()`:
+```
+Score = QUALITY(0.40) + TASK_FIT(0.35) + COST(0.15) + SPEED(0.10)
+```
+
+| Component | What It Measures | Source |
+|-----------|-----------------|--------|
+| **QUALITY** | Provider reputation + editorial curation + tags (realism, typography) | Module-level `_CURATED_MODELS`, `_PROVIDER_BONUS` |
+| **TASK_FIT** | Category match, capability requirements (hard fail if lacking), content affinity | `_CONTENT_AFFINITY`, `_UTILITY_PATTERNS` |
+| **COST** | Non-linear tiers ($0.01=0.95, $0.03=0.85, $0.05=0.70, $0.08=0.50) | `_ESTIMATED_COSTS` |
+| **SPEED** | Thinking penalty (-0.7), simple text-to-image bonus (+0.9) | Schema `thinking_level`, `num_input_params` |
+
+**Anti-bonus:** `_UTILITY_PATTERNS` = `["tiling", "material", "character", "lora", "inpaint", ...]` — models matching these get -0.10 QUALITY, hard floor at 0.05 (filtered out).
+
+**Calibration methodology:** Write the expected ranking for 3 test queries, run engine, compare actual vs expected, adjust weights until ranking matches. SDD (SPEC → Implement → Test → Iterate).
 
 ```python
 from hermesfy.model_query_engine import ModelQueryEngine, TaskSpec
@@ -218,8 +234,14 @@ results = engine.query(TaskSpec(
 **Build the index:**
 ```bash
 cd /opt/hermesfy-studio
-python3 scripts/build_model_index.py  # ~25 min for 1333 schemas
+export FAL_KEY="$FAL_API_KEY"
+python3 scripts/build_model_index.py  # ~25 min for 1333 schemas (67 pages + 1319 schema calls)
 ```
+
+**Index build pitfalls:**
+- `s.get("input") or []` NOT `s.get("input", [])` — genmedia schemas can have `"input": null` (returns None, default only fires on missing key)
+- Background processes lose PATH — pass full binary path: `GENMEDIA=$(which genmedia)` in shell, then `'${GENMEDIA}'` expands before Python sees it
+- FAL rate limits: schema extraction at ~1-2s per model is safe. Don't parallelize without backoff.
 
 ### fal-model-taxonomy
 
@@ -310,6 +332,17 @@ The `generate()` method is **async** — uses `asyncio.create_subprocess_exec` u
 
 ## Pitfalls
 
+### 🚨 ANTI-BYPASS: Always use Hermesfy DAG, NEVER genmedia run directly
+
+When working with FAL image generation/editing, **always route through Hermesfy's DAG executor**, not ad-hoc `genmedia run` CLI calls. The genmedia CLI has no persistence, no audit trail, no workflow history — everything done there is invisible. Hermesfy's `execute()` function + GenmediaProvider gives you all of that for free.
+
+**The DAG has all needed node types already:**
+- `reference_image` → `img2img` → `upscale` (or any chain)
+- All node types (img2img, upscale, inpaint, outpainting, remove_bg, etc.) work via GenmediaProvider
+- Reference resolution (`{{node_id}}`) connects nodes automatically
+
+**BudgetGate default ($0.07) is too low for expensive models.** GPT Image 2 Edit costs $0.12/minimum — always pass `options={"budget": 0.25}` or higher when using premium edit models. The executor blocks nodes that exceed the budget gate silently.
+
 ### `num_inference_steps` cap per model
 
 | Model | Max `num_inference_steps` |
@@ -332,3 +365,95 @@ FLUX schnell can merge/confuse multiple distinct products in a single prompt (e.
 ### Test count is 341, not 312
 
 The skill originally listed 312. Actual count: 341 (314 original + 27 genmedia provider tests).
+
+### ANTI-PATTERN: Never bypass Hermesfy with direct genmedia calls
+
+**The mistake:** Using `genmedia run <model> --prompt "..."` directly to test/edit images instead of building a Hermesfy DAG workflow.
+
+**Why it's wrong:**
+- Zero persistence — no workflow JSON saved, no history.jsonl entry, no audit trail
+- No DAG — can't chain multiple edits, no node state tracking
+- User expectation: Hermesfy was built for this. Using genmedia directly makes the plugin dead weight.
+
+**The right way:**
+1. Upload image: `genmedia upload <path>` → get CDN URL
+2. Build DAG via Hermesfy: `reference_image` → `img2img` → `upscale` → ...
+3. Execute via `hermesfy_execute_workflow` or `PYTHONPATH=src python3 -m hermesfy.cli`
+4. Workflow auto-saved to `~/.hermes/hermesfy/workflows/<id>.json`
+
+**Recovery when you already ran genmedia directly:** The results exist on FAL CDN but have no Hermesfy trace. Re-upload the output to FAL and feed it as a `reference_image` node in a new DAG.
+
+### Hermesfy node types are model-agnostic
+
+The `img2img`, `upscale`, `inpaint`, and `image_gen` node types accept **any** FAL model in their `model` config field — not just the defaults listed in `_NODE_DEFAULT_MODELS`.
+
+| Node Type | Default Model | Also Works With |
+|-----------|--------------|-----------------|
+| `img2img` | `fal-ai/flux/dev/image-to-image` | `openai/gpt-image-2/edit`, `fal-ai/ideogram/v3/edit`, `fal-ai/bytedance/seedream/v4.5/edit`, `fal-ai/hunyuan-image/v3/instruct/edit`, `fal-ai/ideogram/v3/remix`, etc. |
+| `upscale` | `fal-ai/clarity-upscaler` | `fal-ai/topaz/upscale/image`, `fal-ai/ideogram/upscale`, `fal-ai/real-esrgan` |
+| `inpaint` | `fal-ai/flux/inpainting` | `fal-ai/ideogram/v3/edit` (with mask_url) |
+| `image_gen` | `fal-ai/flux/schnell` | `openai/gpt-image-2`, `fal-ai/flux-pro/kontext`, `fal-ai/ideogram/v3`, etc. |
+
+The genmedia provider calls `genmedia run <model>` — it passes the model string verbatim. Any model that `genmedia run` supports works in Hermesfy.
+
+### Ideogram V3 Layerize Text does NOT fit image→image DAGs
+
+`fal-ai/ideogram/v3/layerize-text` outputs:
+- `image` — background with text **removed** (not improved)
+- `text_containers` — hierarchical JSON of text elements
+- `text_html` — overlay HTML for recompositing
+
+It separates text from image for external editing — it does NOT produce an image with improved text. Cannot be used as a final node in an image→image pipeline. For text improvement in a DAG, use `fal-ai/ideogram/v3/remix` or `fal-ai/ideogram/v3/edit` with a text mask instead.
+
+### Model-specific genmedia quirks
+
+- **FLUX Kontext:** expects `image_url` (singular), NOT `image_urls`. Most other edit models use `image_urls` (plural/array).
+- **Seedream 4.5 Edit:** has minimum resolution 1920×1920. Smaller inputs get upscaled, losing original aspect ratio. Set `image_size` explicitly to preserve proportions.
+- **GPT Image 2 Edit:** supports `Change:` / `Preserve:` / `Constraints:` prompt format. Brand names may trigger content policy filters. **Known to be slow (60-180s) — needs timeout ≥360s.**
+- **Ideogram V3 Edit:** requires `mask_url` with identical dimensions to `image_url` — it's inpainting-only, not prompt-guided edit.
+
+### GenmediaProvider Critical Fixes (May 2026)
+
+These fixes are in `src/hermesfy/providers/genmedia.py` and MUST be preserved across updates:
+
+**1. `image_urls` vs `image_url` auto-detection:**
+Different FAL models expect different parameter names for image input. The provider now auto-detects based on model family:
+
+```python
+_IMAGE_URL_SINGULAR_FAMILIES = [
+    "fal-ai/flux-pro/kontext",
+    "fal-ai/flux/redux",
+    "fal-ai/ideogram/",
+    "fal-ai/flux/dev/image-to-image",
+    "fal-ai/topaz/",
+    "fal-ai/clarity-upscaler",
+]
+
+def _model_uses_image_url_singular(model: str) -> bool:
+    for family in _IMAGE_URL_SINGULAR_FAMILIES:
+        if model.startswith(family):
+            return True
+    return False
+```
+
+In `_build_args()`, the image input line uses this check:
+```python
+if _model_uses_image_url_singular(model):
+    args.extend(["--image_url", image_url])
+else:
+    args.extend(["--image_urls", json.dumps([image_url])])
+```
+
+**Without this fix:** GPT Image 2 Edit, Seedream, Hunyuan, Nano Banana all fail with `Validation error — image_urls: Field required` because they expect plural. FLUX Kontext, Ideogram, and Topaz use singular. The auto-detection handles both.
+
+**2. Timeout for slow models:**
+`DEFAULT_TIMEOUT` was increased from 180s to **360s**. GPT Image 2 Edit needs 60-180s and was being killed prematurely. Fast models (Seedream, Hunyuan, FLUX) complete in 10-30s regardless.
+
+**3. Speed benchmark (verified May 2026):**
+| Method | Topaz Upscale Time | Overhead |
+|--------|-------------------|----------|
+| `genmedia run` direct | 14.1s | 0% |
+| Hermesfy Provider (warm) | ~14.2s | ~100ms |
+| Hermesfy Provider (cold import) | 18.5s | +4.4s (Python startup) |
+
+The genmedia binary is identical — overhead is negligible subprocess spawn + JSON parse (~100ms). No structural slowdown. The cold-start Python import is one-time per session.
