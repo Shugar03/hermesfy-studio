@@ -54,13 +54,23 @@ function App() {
   const onSend = useCallback(async () => {
     try {
       setError('');
-      if (!sessionId || !chatInput.trim()) return;
-      const turn = await api.sendMessage(sessionId, chatInput.trim());
+      const message = chatInput.trim();
+      if (!message) return;
+
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        const s = await api.createSession('Hermesfy V5 Session', workflowId || undefined);
+        currentSessionId = s.id;
+        setSessionId(s.id);
+        if (!workflowId && s.workflow_id) setWorkflowId(s.workflow_id);
+      }
+
+      const turn = await api.sendMessage(currentSessionId, message);
       addTurn(turn);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed sending message');
     }
-  }, [api, sessionId, chatInput, addTurn]);
+  }, [api, sessionId, workflowId, chatInput, addTurn, setSessionId, setWorkflowId]);
 
   const onConnectWs = useCallback(() => {
     disconnectRef.current?.();
