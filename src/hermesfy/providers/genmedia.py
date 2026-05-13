@@ -54,8 +54,10 @@ _IMAGE_URL_SINGULAR_FAMILIES = [
     "fal-ai/flux/redux",
     "fal-ai/ideogram/",
     "fal-ai/flux/dev/image-to-image",
+    "fal-ai/flux/inpainting",
     "fal-ai/topaz/",
     "fal-ai/clarity-upscaler",
+    "fal-ai/birefnet",
 ]
 
 

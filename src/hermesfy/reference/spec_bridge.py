@@ -447,7 +447,7 @@ class SpecBridge:
         import hashlib
         # Usar hash del spec para seed consistente
         spec_str = json.dumps(spec.to_dict(), sort_keys=True)
-        hash_obj = hashlib.md5(spec_str.encode())
+        hash_obj = hashlib.sha256(spec_str.encode())
         return int(hash_obj.hexdigest()[:8], 16)
 
     def _get_dimensions(self, aspect_ratio: str) -> tuple[int, int]:

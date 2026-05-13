@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sqlite3
+import secrets
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -77,8 +78,7 @@ class MoodboardDB:
     @staticmethod
     def _generate_id() -> str:
         """Genera IDs tipo mb_a1b2c3d4."""
-        import hashlib
-        suffix = hashlib.md5(str(time.time_ns()).encode()).hexdigest()[:8]
+        suffix = secrets.token_hex(4)
         return f"mb_{suffix}"
 
     # ── CRUD ───────────────────────────────────────────────────────────
@@ -120,12 +120,34 @@ class MoodboardDB:
 
     def update_moodboard(self, mb_id: str, **kwargs):
         """Actualiza campos de un moodboard."""
-        now = datetime.now(timezone.utc).isoformat()
-        kwargs["updated_at"] = now
-        sets = ", ".join(f"{k} = ?" for k in kwargs)
-        vals = list(kwargs.values()) + [mb_id]
+        columns = {
+            "concept": "concept",
+            "source": "source",
+            "source_url": "source_url",
+            "format": "format",
+            "brand": "brand",
+            "status": "status",
+            "error_msg": "error_msg",
+            "image_count": "image_count",
+            "images_path": "images_path",
+            "source_data": "source_data",
+            "mood_spec": "mood_spec",
+            "mood_spec_md": "mood_spec_md",
+            "tags": "tags",
+            "used_in_generations": "used_in_generations",
+            "last_used_at": "last_used_at",
+            "updated_at": "updated_at",
+        }
+        filtered = {k: v for k, v in kwargs.items() if k in columns}
+        if not filtered:
+            return
+
+        filtered["updated_at"] = datetime.now(timezone.utc).isoformat()
+
         with self._conn() as conn:
-            conn.execute(f"UPDATE moodboards SET {sets} WHERE id = ?", vals)
+            for key, value in filtered.items():
+                column = columns[key]
+                conn.execute(f"UPDATE moodboards SET {column} = ? WHERE id = ?", (value, mb_id))
 
     def mark_used(self, mb_id: str):
         """Incrementa contador de usos."""
@@ -152,20 +174,24 @@ class MoodboardDB:
         status: str | None = None,
     ) -> list[dict]:
         """Lista moodboards con filtros opcionales."""
-        where = []
-        params = []
+        query = "SELECT * FROM moodboards"
+        params: list[Any] = []
+        clauses: list[str] = []
+
         if brand:
-            where.append("brand = ?")
+            clauses.append("brand = ?")
             params.append(brand)
         if status:
-            where.append("status = ?")
+            clauses.append("status = ?")
             params.append(status)
-        clause = ("WHERE " + " AND ".join(where)) if where else ""
+
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
         with self._conn() as conn:
-            rows = conn.execute(
-                f"SELECT * FROM moodboards {clause} ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                params + [limit, offset],
-            ).fetchall()
+            rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
     def search_moodboards(self, query: str, limit: int = 10) -> list[dict]:

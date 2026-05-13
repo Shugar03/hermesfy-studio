@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import logging
 import os
+import ipaddress
+import socket
 import requests
 import time
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Optional
+from urllib.parse import urlparse
 
 logger = logging.getLogger("hermesfy.reference.delivery")
 
@@ -20,7 +24,29 @@ class Delivery:
     """Maneja la descarga y entrega de imágenes generadas."""
 
     # Los outputs de Fal.ai expiran — descargar inmediatamente
-    DEFAULT_OUTPUT_DIR = "/tmp/hermesfy_outputs"
+    DEFAULT_OUTPUT_DIR = os.path.join(gettempdir(), "hermesfy_outputs")
+
+    @staticmethod
+    def _is_public_http_url(image_url: str) -> bool:
+        try:
+            parsed = urlparse(image_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                return False
+            host = parsed.hostname
+            for _family, _socktype, _proto, _canonname, sockaddr in socket.getaddrinfo(host, None):
+                ip = ipaddress.ip_address(sockaddr[0])
+                if (
+                    ip.is_private
+                    or ip.is_loopback
+                    or ip.is_link_local
+                    or ip.is_multicast
+                    or ip.is_reserved
+                    or ip.is_unspecified
+                ):
+                    return False
+            return True
+        except Exception:
+            return False
 
     def __init__(self, output_dir: str | None = None):
         self.output_dir = output_dir or self.DEFAULT_OUTPUT_DIR
@@ -37,6 +63,9 @@ class Delivery:
         Returns:
             Ruta absoluta al archivo descargado.
         """
+        if not self._is_public_http_url(image_url):
+            raise ValueError("Blocked non-public or invalid URL for image download")
+
         if not filename:
             timestamp = int(time.time())
             filename = f"hermesfy_vrh_{timestamp}.png"

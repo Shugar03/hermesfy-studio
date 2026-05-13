@@ -1,0 +1,70 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0f1f;
+  --panel: #101a33;
+  --line: #1f2a44;
+  --mint: #6ef7d6;
+  --text: #eaf2ff;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr auto auto auto auto;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+input, button {
+  background: #0f1730;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+button { cursor: pointer; }
+.pill { padding: 8px 10px; border-radius: 99px; border: 1px solid var(--line); font-size: 12px; }
+.pill.open { color: #0ad39c; }
+.pill.error { color: #ff6b6b; }
+.pill.closed { color: #ffd166; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.2fr 2fr 1fr;
+  gap: 10px;
+  padding: 10px;
+  height: calc(100vh - 64px);
+}
+.col { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #101a33 0%, #0e1830 100%);
+  padding: 10px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.panel h3 { margin: 0 0 10px; font-size: 14px; color: var(--mint); }
+.scroll { overflow: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.msg, .event { border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
+.canvas { height: 100%; }
+.canvasInner { height: 100%; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+pre { margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+.errorBanner {
+  margin: 10px;
+  padding: 10px;
+  border: 1px solid #7a2c2c;
+  color: #ffd2d2;
+  background: #2a1111;
+  border-radius: 10px;
+}
+
+@media (max-width: 1200px) {
+  .grid { grid-template-columns: 1fr; height: auto; }
+  .topbar { grid-template-columns: 1fr; }
+}
