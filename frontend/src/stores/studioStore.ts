@@ -24,8 +24,11 @@ type StudioState = {
   setSelectedNodeId: (id: string | null) => void;
 };
 
+const runtimeDefaultBaseUrl =
+  typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8090';
+
 export const useStudioStore = create<StudioState>((set) => ({
-  baseUrl: 'http://127.0.0.1:8090',
+  baseUrl: runtimeDefaultBaseUrl,
   workflowId: '',
   sessionId: '',
   authToken: '',
